@@ -248,15 +248,17 @@
                 fallingBlock.y += fallingBlock.vy;
 
                 if (fallingBlock.y + GAME_CONFIG.BLOCK_HEIGHT * scale >= HEIGHT || checkCollision(fallingBlock)) {
+                    fallingBlock.y = Math.min(fallingBlock.y, HEIGHT - GAME_CONFIG.BLOCK_HEIGHT * scale);
                     createBreakParticles(fallingBlock);
                     fallCount++;
                     if (fallCount >= GAME_CONFIG.MAX_FALLS) {
                         gameOver = true;
+                        setTimeout(showGameOver, 1000);
                     } else {
                         flashScreen();
                         resetBlockPosition();
-                        fallingBlock = null;
                     }
+                    fallingBlock = null;
                 }
             }
 
@@ -265,11 +267,14 @@
                 fallingLeftover.y += fallingLeftover.vy;
 
                 if (fallingLeftover.y + GAME_CONFIG.BLOCK_HEIGHT * scale >= HEIGHT || checkCollision(fallingLeftover)) {
+                    fallingLeftover.y = Math.min(fallingLeftover.y, HEIGHT - GAME_CONFIG.BLOCK_HEIGHT * scale);
                     createBreakParticles(fallingLeftover);
                     fallingLeftover = null;
                 }
             }
         }
+
+
 
         function flashScreen() {
             let flashCount = 0;
@@ -280,11 +285,14 @@
                 if (flashCount < GAME_CONFIG.FLASH_COUNT * 2) {
                     setTimeout(flash, GAME_CONFIG.FLASH_DURATION);
                 } else {
-                    drawGameState();
+                    if (!gameOver) {
+                        drawGameState();
+                    }
                 }
             };
             flash();
         }
+
 
         function updatePowerUps() {
             if (Math.random() < GAME_CONFIG.POWER_UP_CHANCE) {
@@ -379,24 +387,25 @@
             if (gameOver || fallingBlock) return;
 
             if (stack.length === 0) {
-                stack.push({x, y, width: blockWidth});
+                stack.push({ x, y, width: blockWidth });
             } else {
                 const prevBlock = stack[stack.length - 1];
                 const overlap = Math.min(x + blockWidth, prevBlock.x + prevBlock.width) - Math.max(x, prevBlock.x);
 
-                if (overlap > 0) {
+                // Ensure there's at least a 3px overlap before slicing
+                if (overlap >= 1) {
                     const newWidth = isPrivileged ? blockWidth : overlap;
                     const newX = isPrivileged ? x : Math.max(x, prevBlock.x);
-                    stack.push({x: newX, y, width: newWidth});
-                    
+                    stack.push({ x: newX, y, width: newWidth });
+
                     if (!isPrivileged && overlap < blockWidth) {
                         if (x < newX) {
-                            fallingLeftover = {x, y, width: newX - x, vy: 0};
+                            fallingLeftover = { x, y, width: newX - x, vy: 0 };
                         } else {
-                            fallingLeftover = {x: newX + newWidth, y, width: (x + blockWidth) - (newX + newWidth), vy: 0};
+                            fallingLeftover = { x: newX + newWidth, y, width: (x + blockWidth) - (newX + newWidth), vy: 0 };
                         }
                     }
-                    
+
                     blockWidth = newWidth;
                     score++;
 
@@ -404,7 +413,8 @@
                         levelUp();
                     }
                 } else {
-                    fallingBlock = {x, y, width: blockWidth, vy: 0};
+                    // If overlap is less than 3px, the block falls
+                    fallingBlock = { x, y, width: blockWidth, vy: 0 };
                     return;
                 }
             }
@@ -412,6 +422,8 @@
             isPrivileged = false;
             resetBlockPosition();
         }
+
+
 
         function levelUp() {
             level++;
@@ -479,6 +491,7 @@
             ctx.textAlign = 'left';
             tryAgainButton.style.display = 'block';
         }
+
 
         document.addEventListener('keydown', (event) => {
             if (event.code === 'Space') {
