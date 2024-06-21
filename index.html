@@ -336,7 +336,7 @@
             stack.forEach(block => drawBlock(block.x, block.y, block.width, 'black'));
 
             if (fallingBlock) {
-                drawBlock(fallingBlock.x, fallingBlock.y, fallingBlock.width, 'red');
+                drawBlock(fallingBlock.x, fallingBlock.y, fallingBlock.width, 'gray');
             } else if (!gameOver) {
                 drawBlock(x, y, blockWidth, 'black');
             }
