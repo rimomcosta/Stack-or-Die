@@ -56,7 +56,7 @@
             INITIAL_BLOCK_SPEED: 2,
             INITIAL_BLOCK_WIDTH: 100,
             BLOCK_HEIGHT: 20,
-            POWER_UP_CHANCE: 0.0005,
+            POWER_UP_CHANCE: 0.001,
             POWER_UP_FALL_SPEED: 0.5,
             POWER_UP_WIGGLE_SPEED: 0.05,
             POWER_UP_WIGGLE_AMPLITUDE: 2,
@@ -213,7 +213,7 @@
                 }
                 return;
             }
-
+            ctx.fillStyle = 'white';
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
             if (!fallingBlock) {
