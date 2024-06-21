@@ -392,7 +392,7 @@
                 const prevBlock = stack[stack.length - 1];
                 const overlap = Math.min(x + blockWidth, prevBlock.x + prevBlock.width) - Math.max(x, prevBlock.x);
 
-                // Ensure there's at least a 3px overlap before slicing
+                // Ensure there's at least a 1px overlap before slicing
                 if (overlap >= 1) {
                     const newWidth = isPrivileged ? blockWidth : overlap;
                     const newX = isPrivileged ? x : Math.max(x, prevBlock.x);
@@ -413,7 +413,7 @@
                         levelUp();
                     }
                 } else {
-                    // If overlap is less than 3px, the block falls
+                    // If overlap is less than 1px, the block falls
                     fallingBlock = { x, y, width: blockWidth, vy: 0 };
                     return;
                 }
