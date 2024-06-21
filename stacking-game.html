@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stacking Game with Levels and Customization</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        canvas {
+            border: 1px solid #000;
+        }
+        #tryAgainButton {
+            position: absolute;
+            left: 50%;
+            top: 70%;
+            transform: translate(-50%, -50%);
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+        #tryAgainButton:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <button id="tryAgainButton">Try Again</button>
+    </div>
+    <script>
+        // Game configuration parameters
+        const GAME_CONFIG = {
+            INITIAL_BLOCK_SPEED: 2,
+            INITIAL_BLOCK_WIDTH: 100,
+            BLOCK_HEIGHT: 20,
+            POWER_UP_CHANCE: 0.0005,  // 0.05% chance per frame
+            POWER_UP_FALL_SPEED: 0.5,
+            POWER_UP_WIGGLE_SPEED: 0.05,
+            POWER_UP_WIGGLE_AMPLITUDE: 2,
+            GRAVITY: 0.5,
+            LEVEL_UP_THRESHOLD: 0.8,  // 80% of screen height
+            SPEED_INCREASE_FACTOR: 1.15,  // 15% speed increase per level
+            MAX_FALLS: 3,
+            FLASH_DURATION: 100,  // Duration of flash in milliseconds
+            FLASH_COUNT: 3,  // Number of times to flash
+            // Image options (set to null to use default shapes)
+            BAR_IMAGE_SRC: null,  // e.g., 'path/to/bar-image.png'
+            POWER_UP_IMAGE_SRC: null  // e.g., 'path/to/powerup-image.png'
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const tryAgainButton = document.getElementById('tryAgainButton');
+
+        const WIDTH = 400;
+        const HEIGHT = 600;
+
+        let blockWidth = GAME_CONFIG.INITIAL_BLOCK_WIDTH;
+        let blockSpeed = GAME_CONFIG.INITIAL_BLOCK_SPEED;
+        let direction = 1;
+        let score = 0;
+        let level = 1;
+        let fallCount = 0;
+
+        let x = 0;
+        let y = HEIGHT - GAME_CONFIG.BLOCK_HEIGHT;
+
+        let stack = [];
+        let gameOver = false;
+        let fallingBlock = null;
+        let fallingLeftover = null;
+
+        const BREAK_PARTICLES = [];
+        const PARTICLE_COUNT = 20;
+
+        let blinkCount = 0;
+        const BLINK_DURATION = 100;
+        const BLINK_TIMES = 3;
+
+        let powerUps = [];
+        const POWER_UP_RADIUS = 5;
+
+        let isPrivileged = false;
+        let showLevelUp = false;
+        let levelUpTimer = 0;
+
+        // Load images if provided
+        const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
+        const powerUpImage = GAME_CONFIG.POWER_UP_IMAGE_SRC ? new Image() : null;
+
+        if (barImage) barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
+        if (powerUpImage) powerUpImage.src = GAME_CONFIG.POWER_UP_IMAGE_SRC;
+
+        function initGame() {
+            blockWidth = GAME_CONFIG.INITIAL_BLOCK_WIDTH;
+            blockSpeed = GAME_CONFIG.INITIAL_BLOCK_SPEED;
+            score = 0;
+            level = 1;
+            fallCount = 0;
+            stack = [];
+            gameOver = false;
+            fallingBlock = null;
+            fallingLeftover = null;
+            BREAK_PARTICLES.length = 0;
+            blinkCount = 0;
+            powerUps = [];
+            isPrivileged = false;
+            showLevelUp = false;
+            levelUpTimer = 0;
+            tryAgainButton.style.display = 'none';
+            resetBlockPosition();
+        }
+
+        function resetBlockPosition() {
+            if (Math.random() < 0.5) {
+                x = 0;
+                direction = 1;
+            } else {
+                x = WIDTH - blockWidth;
+                direction = -1;
+            }
+            y = HEIGHT - GAME_CONFIG.BLOCK_HEIGHT - (stack.length * GAME_CONFIG.BLOCK_HEIGHT);
+        }
+
+        function drawBlock(x, y, width, color) {
+            if (barImage) {
+                ctx.drawImage(barImage, x, y, width, GAME_CONFIG.BLOCK_HEIGHT);
+            } else {
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT);
+            }
+            if (isPrivileged && !fallingBlock) {
+                ctx.strokeStyle = 'gold';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT);
+            }
+        }
+
+        function drawScore() {
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+            ctx.fillText(`Level: ${level}`, 10, 60);
+            ctx.fillText(`Falls: ${fallCount}/${GAME_CONFIG.MAX_FALLS}`, 10, 90);
+        }
+
+        function moveBlock() {
+            x += blockSpeed * direction;
+            if (x < 0) {
+                x = 0;
+                direction = 1;
+            } else if (x + blockWidth > WIDTH) {
+                x = WIDTH - blockWidth;
+                direction = -1;
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (gameOver) {
+                if (blinkCount < BLINK_TIMES * 2) {
+                    if (blinkCount % 2 === 0) {
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                    } else {
+                        drawGameState();
+                    }
+                    blinkCount++;
+                    setTimeout(() => requestAnimationFrame(gameLoop), BLINK_DURATION);
+                } else {
+                    setTimeout(showGameOver, 1000);
+                }
+                return;
+            }
+
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            if (!fallingBlock) {
+                moveBlock();
+                checkPowerUpCollision();
+            }
+
+            updateFallingBlocks();
+            updatePowerUps();
+            drawGameState();
+
+            if (showLevelUp) {
+                drawLevelUp();
+                levelUpTimer++;
+                if (levelUpTimer > 120) { // Show for 2 seconds (60 fps * 2)
+                    showLevelUp = false;
+                    levelUpTimer = 0;
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateFallingBlocks() {
+            if (fallingBlock) {
+                fallingBlock.vy += GAME_CONFIG.GRAVITY;
+                fallingBlock.y += fallingBlock.vy;
+
+                if (fallingBlock.y + GAME_CONFIG.BLOCK_HEIGHT >= HEIGHT || checkCollision(fallingBlock)) {
+                    createBreakParticles(fallingBlock);
+                    fallCount++;
+                    if (fallCount >= GAME_CONFIG.MAX_FALLS) {
+                        gameOver = true;
+                    } else {
+                        flashScreen();
+                        resetBlockPosition();
+                        fallingBlock = null;
+                    }
+                }
+            }
+
+            if (fallingLeftover) {
+                fallingLeftover.vy += GAME_CONFIG.GRAVITY;
+                fallingLeftover.y += fallingLeftover.vy;
+
+                if (fallingLeftover.y + GAME_CONFIG.BLOCK_HEIGHT >= HEIGHT || checkCollision(fallingLeftover)) {
+                    createBreakParticles(fallingLeftover);
+                    fallingLeftover = null;
+                }
+            }
+        }
+
+        function flashScreen() {
+            let flashCount = 0;
+            const flash = () => {
+                ctx.fillStyle = flashCount % 2 === 0 ? 'white' : 'red';
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                flashCount++;
+                if (flashCount < GAME_CONFIG.FLASH_COUNT * 2) {
+                    setTimeout(flash, GAME_CONFIG.FLASH_DURATION);
+                } else {
+                    drawGameState(); // Redraw the game state after flashing
+                }
+            };
+            flash();
+        }
+
+        function updatePowerUps() {
+            if (Math.random() < GAME_CONFIG.POWER_UP_CHANCE) {
+                powerUps.push({
+                    x: Math.random() * (WIDTH - 2 * POWER_UP_RADIUS) + POWER_UP_RADIUS,
+                    y: -POWER_UP_RADIUS,
+                    angle: 0
+                });
+            }
+
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                let powerUp = powerUps[i];
+                powerUp.y += GAME_CONFIG.POWER_UP_FALL_SPEED;
+                powerUp.angle += GAME_CONFIG.POWER_UP_WIGGLE_SPEED;
+                powerUp.x += Math.sin(powerUp.angle) * GAME_CONFIG.POWER_UP_WIGGLE_AMPLITUDE;
+
+                // Wrap around horizontally
+                if (powerUp.x < 0) powerUp.x += WIDTH;
+                if (powerUp.x > WIDTH) powerUp.x -= WIDTH;
+
+                // Wrap around vertically
+                if (powerUp.y > HEIGHT + POWER_UP_RADIUS) {
+                    powerUp.y = -POWER_UP_RADIUS;
+                }
+            }
+        }
+
+        function checkPowerUpCollision() {
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                let powerUp = powerUps[i];
+                if (powerUp.y + POWER_UP_RADIUS > y &&
+                    powerUp.y - POWER_UP_RADIUS < y + GAME_CONFIG.BLOCK_HEIGHT &&
+                    powerUp.x + POWER_UP_RADIUS > x &&
+                    powerUp.x - POWER_UP_RADIUS < x + blockWidth) {
+                    // Power-up collected
+                    const recoveryPercentage = Math.random() * 0.4 + 0.3; // 30% to 70%
+                    const recoveryAmount = GAME_CONFIG.INITIAL_BLOCK_WIDTH * recoveryPercentage;
+                    blockWidth = Math.min(blockWidth + recoveryAmount, GAME_CONFIG.INITIAL_BLOCK_WIDTH);
+                    
+                    // Ensure the block doesn't exceed screen boundaries
+                    if (x + blockWidth > WIDTH) {
+                        x = WIDTH - blockWidth;
+                    }
+                    
+                    isPrivileged = true;
+                    powerUps.splice(i, 1);
+                    break; // Exit the loop after collecting one power-up
+                }
+            }
+        }
+
+        function drawGameState() {
+            stack.forEach(block => drawBlock(block.x, block.y, block.width, 'black'));
+
+            if (fallingBlock) {
+                drawBlock(fallingBlock.x, fallingBlock.y, fallingBlock.width, 'red');
+            } else if (!gameOver) {
+                drawBlock(x, y, blockWidth, 'black');
+            }
+
+            if (fallingLeftover) {
+                drawBlock(fallingLeftover.x, fallingLeftover.y, fallingLeftover.width, 'black');
+            }
+
+            powerUps.forEach(powerUp => {
+                if (powerUpImage) {
+                    ctx.drawImage(powerUpImage, powerUp.x - POWER_UP_RADIUS, powerUp.y - POWER_UP_RADIUS, POWER_UP_RADIUS * 2, POWER_UP_RADIUS * 2);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(powerUp.x, powerUp.y, POWER_UP_RADIUS, 0, Math.PI * 2);
+                    ctx.fillStyle = 'blue';
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            });
+
+            updateAndDrawParticles();
+            drawScore();
+        }
+
+        function checkCollision(block) {
+            for (let stackBlock of stack) {
+                if (block.y + GAME_CONFIG.BLOCK_HEIGHT > stackBlock.y && 
+                    block.y < stackBlock.y + GAME_CONFIG.BLOCK_HEIGHT &&
+                    block.x < stackBlock.x + stackBlock.width &&
+                    block.x + block.width > stackBlock.x) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function placeBlock() {
+            if (gameOver || fallingBlock) return;
+
+            if (stack.length === 0) {
+                stack.push({x, y, width: blockWidth});
+            } else {
+                const prevBlock = stack[stack.length - 1];
+                const overlap = Math.min(x + blockWidth, prevBlock.x + prevBlock.width) - Math.max(x, prevBlock.x);
+
+                if (overlap > 0) {
+                    const newWidth = isPrivileged ? blockWidth : overlap;
+                    const newX = isPrivileged ? x : Math.max(x, prevBlock.x);
+                    stack.push({x: newX, y, width: newWidth});
+                    
+                    if (!isPrivileged && overlap < blockWidth) {
+                        if (x < newX) {
+                            fallingLeftover = {x, y, width: newX - x, vy: 0};
+                        } else {
+                            fallingLeftover = {x: newX + newWidth, y, width: (x + blockWidth) - (newX + newWidth), vy: 0};
+                        }
+                    }
+                    
+                    blockWidth = newWidth;
+                    score++;
+
+                    // Check for level up
+                    if (stack.length * GAME_CONFIG.BLOCK_HEIGHT >= HEIGHT * GAME_CONFIG.LEVEL_UP_THRESHOLD) {
+                        levelUp();
+                    }
+                } else {
+                    fallingBlock = {x, y, width: blockWidth, vy: 0};
+                    return;
+                }
+            }
+
+            isPrivileged = false;
+            resetBlockPosition();
+        }
+
+        function levelUp() {
+            level++;
+            blockSpeed *= GAME_CONFIG.SPEED_INCREASE_FACTOR;
+            showLevelUp = true;
+            levelUpTimer = 0;
+
+            // Clear the stack
+            stack = [];
+            resetBlockPosition();
+        }
+
+        function drawLevelUp() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            ctx.fillStyle = 'white';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Level ${level}!`, WIDTH / 2, HEIGHT / 2);
+            ctx.font = '24px Arial';
+            ctx.fillText('Speed increased!', WIDTH / 2, HEIGHT / 2 + 40);
+            ctx.textAlign = 'left';
+        }
+
+        function createBreakParticles(block) {
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                BREAK_PARTICLES.push({
+                    x: block.x + Math.random() * block.width,
+                    y: block.y + Math.random() * GAME_CONFIG.BLOCK_HEIGHT,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: (Math.random() - 0.5) * 5,
+                    radius: Math.random() * 3 + 1,
+                    color: 'red'
+                });
+            }
+        }
+
+        function updateAndDrawParticles() {
+            for (let i = BREAK_PARTICLES.length - 1; i >= 0; i--) {
+                let p = BREAK_PARTICLES[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                if (p.y > HEIGHT) {
+                    BREAK_PARTICLES.splice(i, 1);
+                }
+            }
+        }
+
+        function showGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            ctx.fillStyle = 'white';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over', WIDTH / 2, HEIGHT / 2);
+            ctx.font = '24px Arial';
+            ctx.fillText(`Score: ${score}`, WIDTH / 2, HEIGHT / 2 + 40);
+            ctx.fillText(`Level: ${level}`, WIDTH / 2, HEIGHT / 2 + 70);
+            ctx.textAlign = 'left';
+            tryAgainButton.style.display = 'block';
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                placeBlock();
+            }
+        });
+
+        canvas.addEventListener('click', placeBlock);
+
+        tryAgainButton.addEventListener('click', () => {
+            initGame();
+            requestAnimationFrame(gameLoop);
+        });
+
+        initGame();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
