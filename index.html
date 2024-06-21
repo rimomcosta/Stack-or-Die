@@ -213,8 +213,13 @@
                 }
                 return;
             }
-            ctx.fillStyle = 'white';
+            
+            // Clear the canvas
             ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            // Fill the canvas with green background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
             if (!fallingBlock) {
                 moveBlock();
