@@ -56,12 +56,6 @@
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const tryAgainButton = document.getElementById("tryAgainButton");
-      const backgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC
-        ? new Image()
-        : null;
-      if (backgroundImage) {
-        backgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC;
-      }
 
       let WIDTH = GAME_CONFIG.INITIAL_WIDTH;
       let HEIGHT = GAME_CONFIG.INITIAL_HEIGHT;
@@ -84,15 +78,51 @@
       let placeTimeLimit;
       let placeTimeRemaining;
 
-      const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
-      const powerUpImage = GAME_CONFIG.POWER_UP_IMAGE_SRC ? new Image() : null;
+      const backgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC
+        ? new Image()
+        : null;
+      if (backgroundImage)
+        backgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC;
 
+      const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
       if (barImage) barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
-      if (powerUpImage) powerUpImage.src = GAME_CONFIG.POWER_UP_IMAGE_SRC;
+
+      let powerUpImage = null;
+      let extraLifeImage = null;
+      let isPowerUpImageLoaded = false;
+      let isExtraLifeImageLoaded = false;
 
       // Audio context and source nodes
       let audioContext;
       let audioSources = {};
+
+      function loadPowerUpImages() {
+        if (GAME_CONFIG.POWER_UP_IMAGE_SRC) {
+          powerUpImage = new Image();
+          powerUpImage.onload = function () {
+            isPowerUpImageLoaded = true;
+            console.log("Power-up image loaded successfully");
+          };
+          powerUpImage.onerror = function () {
+            console.error("Failed to load power-up image");
+            isPowerUpImageLoaded = false;
+          };
+          powerUpImage.src = GAME_CONFIG.POWER_UP_IMAGE_SRC;
+        }
+
+        if (GAME_CONFIG.EXTRA_LIFE_IMAGE_SRC) {
+          extraLifeImage = new Image();
+          extraLifeImage.onload = function () {
+            isExtraLifeImageLoaded = true;
+            console.log("Extra life image loaded successfully");
+          };
+          extraLifeImage.onerror = function () {
+            console.error("Failed to load extra life image");
+            isExtraLifeImageLoaded = false;
+          };
+          extraLifeImage.src = GAME_CONFIG.EXTRA_LIFE_IMAGE_SRC;
+        }
+      }
 
       function resizeCanvas() {
         const containerWidth = gameContainer.clientWidth;
@@ -106,7 +136,6 @@
 
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
 
-        // Resize background image if it exists
         if (backgroundImage && backgroundImage.complete) {
           const imgAspectRatio = backgroundImage.width / backgroundImage.height;
           const canvasAspectRatio = WIDTH / HEIGHT;
@@ -121,12 +150,10 @@
         }
       }
 
-      // Function to initialize audio context
       function initAudioContext() {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
 
-      // Function to load and decode audio files
       async function loadAudio(key, url) {
         if (!url) return;
 
@@ -136,7 +163,6 @@
         audioSources[key] = audioBuffer;
       }
 
-      // Function to play sound
       function playSound(sound) {
         if (audioContext.state === "suspended") {
           audioContext.resume();
@@ -148,7 +174,6 @@
           source.connect(audioContext.destination);
           source.start(0);
         } else {
-          // Fallback to oscillator if sound is not loaded
           const oscillator = audioContext.createOscillator();
           oscillator.type = "sine";
 
@@ -157,55 +182,55 @@
               oscillator.frequency.setValueAtTime(
                 440,
                 audioContext.currentTime
-              ); // A4
+              );
               break;
             case "BLOCK_FALL":
               oscillator.frequency.setValueAtTime(
                 220,
                 audioContext.currentTime
-              ); // A3
+              );
               break;
             case "POWER_UP_COLLECT":
               oscillator.frequency.setValueAtTime(
                 880,
                 audioContext.currentTime
-              ); // A5
+              );
               break;
             case "EXTRA_LIFE_COLLECT":
               oscillator.frequency.setValueAtTime(
                 1760,
                 audioContext.currentTime
-              ); // A6
+              );
               break;
             case "LEVEL_UP":
               oscillator.frequency.setValueAtTime(
                 1046.5,
                 audioContext.currentTime
-              ); // C6
+              );
               break;
             case "GAME_OVER":
               oscillator.frequency.setValueAtTime(
                 110,
                 audioContext.currentTime
-              ); // A2
+              );
               break;
             case "BLOCK_BREAK":
               oscillator.frequency.setValueAtTime(
                 660,
                 audioContext.currentTime
-              ); // E5
+              );
               break;
             case "BLOCK_SLICE":
               oscillator.frequency.setValueAtTime(
                 550,
                 audioContext.currentTime
-              ); // C#5
+              );
               break;
             default:
               oscillator.frequency.setValueAtTime(
                 440,
                 audioContext.currentTime
-              ); // A4
+              );
           }
 
           oscillator.connect(audioContext.destination);
@@ -214,7 +239,6 @@
         }
       }
 
-      // Function to initialize audio
       async function initAudio() {
         initAudioContext();
 
@@ -246,12 +270,10 @@
         resetBlockPosition();
         resetPlaceTimeLimit();
 
-        // Initialize audio context if it hasn't been initialized
         if (!audioContext) {
           initAudioContext();
         }
 
-        // Resume audio context if it's suspended
         if (audioContext.state === "suspended") {
           audioContext.resume();
         }
@@ -290,10 +312,9 @@
       function drawBlock(x, y, width, color) {
         ctx.save();
 
-        // Set shadow properties
-        ctx.shadowColor = "rgba(0, 0, 0, 0.5)"; // Semi-transparent black
-        ctx.shadowBlur = 10 * scale; // Adjust this value to change the softness of the shadow
-        ctx.shadowOffsetY = 5 * scale; // Adjust this value to change the shadow's vertical offset
+        ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+        ctx.shadowBlur = 10 * scale;
+        ctx.shadowOffsetY = 5 * scale;
 
         if (barImage) {
           ctx.drawImage(
@@ -308,7 +329,6 @@
           ctx.fillRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         }
 
-        // Reset shadow properties
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
@@ -319,7 +339,6 @@
           ctx.strokeRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         }
 
-        // Restore the context state
         ctx.restore();
       }
 
@@ -374,8 +393,7 @@
 
         elapsedTime = Date.now() - startTime;
 
-        // ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
-        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
         if (backgroundImage && backgroundImage.complete) {
           ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
@@ -388,10 +406,9 @@
           moveBlock();
           checkPowerUpCollision();
 
-          // Update remaining time
-          placeTimeRemaining -= 1 / 60; // Assuming 60 FPS
+          placeTimeRemaining -= 1 / 60;
           if (placeTimeRemaining <= 0) {
-            placeBlock(); // Automatically place the block when time runs out
+            placeBlock();
             resetPlaceTimeLimit();
           }
         }
@@ -431,16 +448,13 @@
         const barX = 10 * scale;
         const barY = 20 * scale;
 
-        // Draw background
         ctx.fillStyle = "lightgray";
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
-        // Draw remaining time
         const remainingWidth = (placeTimeRemaining / placeTimeLimit) * barWidth;
         ctx.fillStyle = "green";
         ctx.fillRect(barX, barY, remainingWidth, barHeight);
 
-        // Draw border
         ctx.strokeStyle = "black";
         ctx.lineWidth = 2 * scale;
         ctx.strokeRect(barX, barY, barWidth, barHeight);
@@ -594,36 +608,66 @@
         }
 
         powerUps.forEach((powerUp) => {
-          if (powerUpImage) {
-            ctx.drawImage(
-              powerUpImage,
-              powerUp.x - GAME_CONFIG.POWER_UP_RADIUS * scale,
-              powerUp.y - GAME_CONFIG.POWER_UP_RADIUS * scale,
-              GAME_CONFIG.POWER_UP_RADIUS * 2 * scale,
-              GAME_CONFIG.POWER_UP_RADIUS * 2 * scale
-            );
+          if (
+            powerUp.type === "extraLife" &&
+            isExtraLifeImageLoaded &&
+            extraLifeImage
+          ) {
+            try {
+              ctx.drawImage(
+                extraLifeImage,
+                powerUp.x - GAME_CONFIG.POWER_UP_RADIUS * scale,
+                powerUp.y - GAME_CONFIG.POWER_UP_RADIUS * scale,
+                GAME_CONFIG.POWER_UP_RADIUS * 2 * scale,
+                GAME_CONFIG.POWER_UP_RADIUS * 2 * scale
+              );
+            } catch (error) {
+              console.error("Error drawing extra life image:", error);
+              drawFallbackPowerUp(powerUp);
+            }
+          } else if (
+            powerUp.type !== "extraLife" &&
+            isPowerUpImageLoaded &&
+            powerUpImage
+          ) {
+            try {
+              ctx.drawImage(
+                powerUpImage,
+                powerUp.x - GAME_CONFIG.POWER_UP_RADIUS * scale,
+                powerUp.y - GAME_CONFIG.POWER_UP_RADIUS * scale,
+                GAME_CONFIG.POWER_UP_RADIUS * 2 * scale,
+                GAME_CONFIG.POWER_UP_RADIUS * 2 * scale
+              );
+            } catch (error) {
+              console.error("Error drawing power-up image:", error);
+              drawFallbackPowerUp(powerUp);
+            }
           } else {
-            ctx.beginPath();
-            ctx.arc(
-              powerUp.x,
-              powerUp.y,
-              GAME_CONFIG.POWER_UP_RADIUS * scale,
-              0,
-              Math.PI * 2
-            );
-            ctx.fillStyle =
-              powerUp.type === "extraLife"
-                ? GAME_CONFIG.EXTRA_LIFE_COLOR
-                : GAME_CONFIG.POWER_UP_COLOR;
-            ctx.fill();
-            ctx.strokeStyle = GAME_CONFIG.POWER_UP_STROKE_COLOR;
-            ctx.lineWidth = 1 * scale;
-            ctx.stroke();
+            drawFallbackPowerUp(powerUp);
           }
         });
 
         updateAndDrawParticles();
         drawScore();
+      }
+
+      function drawFallbackPowerUp(powerUp) {
+        ctx.beginPath();
+        ctx.arc(
+          powerUp.x,
+          powerUp.y,
+          GAME_CONFIG.POWER_UP_RADIUS * scale,
+          0,
+          Math.PI * 2
+        );
+        ctx.fillStyle =
+          powerUp.type === "extraLife"
+            ? GAME_CONFIG.EXTRA_LIFE_COLOR
+            : GAME_CONFIG.POWER_UP_COLOR;
+        ctx.fill();
+        ctx.strokeStyle = GAME_CONFIG.POWER_UP_STROKE_COLOR;
+        ctx.lineWidth = 1 * scale;
+        ctx.stroke();
       }
 
       function checkCollision(block) {
@@ -639,28 +683,22 @@
         }
         return false;
       }
-      function calculateScore(blockWidth, newWidth, timeRemaining) {
-        // Base score for placing a block
-        let points = 10;
 
-        // Calculate points lost due to inaccurate placement
+      function calculateScore(blockWidth, newWidth, timeRemaining) {
+        let points = 10;
         if (newWidth < blockWidth) {
           const percentageLost = (blockWidth - newWidth) / blockWidth;
           const pointsLost = Math.round(10 * percentageLost);
           points -= pointsLost;
         }
-
-        // Calculate time bonus
         const timeBonus = Math.round(10 * (timeRemaining / placeTimeLimit));
         points += timeBonus;
-
         return points;
       }
 
       function placeBlock() {
         if (gameOver || fallingBlock) return;
 
-        // Resume audio context before playing sound
         if (audioContext.state === "suspended") {
           audioContext.resume();
         }
@@ -681,7 +719,6 @@
             Math.min(x + blockWidth, prevBlock.x + prevBlock.width) -
             Math.max(x, prevBlock.x);
 
-          // Implement snapping
           const snapThreshold = GAME_CONFIG.SNAP_THRESHOLD * scale;
           if (Math.abs(x - prevBlock.x) <= snapThreshold) {
             x = prevBlock.x;
@@ -737,7 +774,6 @@
         }
 
         score += pointsEarned;
-        console.log(`Points earned: ${pointsEarned}`); // For debugging, remove in production
 
         isPrivileged = false;
         resetBlockPosition();
@@ -754,7 +790,6 @@
 
         stack = [];
         resetBlockPosition();
-        // Decrease time limit
         GAME_CONFIG.MIN_PLACE_TIME *= GAME_CONFIG.PLACE_TIME_DECREASE_FACTOR;
         GAME_CONFIG.MAX_PLACE_TIME *= GAME_CONFIG.PLACE_TIME_DECREASE_FACTOR;
 
@@ -809,7 +844,6 @@
         if (gameOverScreenShown) return;
         gameOverScreenShown = true;
 
-        // Ensure flashing stops
         isFlashing = false;
         flashTimer = 0;
 
@@ -877,6 +911,7 @@
 
       async function startGame() {
         await initAudio();
+        loadPowerUpImages();
         initGame();
         gameLoop();
       }
