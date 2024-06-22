@@ -85,8 +85,9 @@
       if (barImage) barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
       if (powerUpImage) powerUpImage.src = GAME_CONFIG.POWER_UP_IMAGE_SRC;
 
-      // Audio objects
-      const AUDIO = {};
+      // Audio context and source nodes
+      let audioContext;
+      let audioSources = {};
 
       function resizeCanvas() {
         const containerWidth = gameContainer.clientWidth;
@@ -101,63 +102,107 @@
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
       }
 
-      function initAudio() {
-        Object.keys(GAME_CONFIG.AUDIO).forEach((key) => {
-          if (GAME_CONFIG.AUDIO[key]) {
-            AUDIO[key] = new Audio(GAME_CONFIG.AUDIO[key]);
-            if (key === "BACKGROUND_MUSIC") {
-              AUDIO[key].loop = true;
-            }
-          }
-        });
+      // Function to initialize audio context
+      function initAudioContext() {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
 
+      // Function to load and decode audio files
+      async function loadAudio(key, url) {
+        if (!url) return;
+
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        audioSources[key] = audioBuffer;
+      }
+
+      // Function to play sound
       function playSound(sound) {
-        if (AUDIO[sound]) {
-          AUDIO[sound].currentTime = 0;
-          AUDIO[sound]
-            .play()
-            .catch((e) => console.warn(`Failed to play ${sound} sound`, e));
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+
+        if (audioSources[sound]) {
+          const source = audioContext.createBufferSource();
+          source.buffer = audioSources[sound];
+          source.connect(audioContext.destination);
+          source.start(0);
         } else {
-          // Default beep sound
-          const context = new (window.AudioContext ||
-            window.webkitAudioContext)();
-          const oscillator = context.createOscillator();
+          // Fallback to oscillator if sound is not loaded
+          const oscillator = audioContext.createOscillator();
           oscillator.type = "sine";
 
           switch (sound) {
             case "BLOCK_PLACE":
-              oscillator.frequency.setValueAtTime(440, context.currentTime); // A4
+              oscillator.frequency.setValueAtTime(
+                440,
+                audioContext.currentTime
+              ); // A4
               break;
             case "BLOCK_FALL":
-              oscillator.frequency.setValueAtTime(220, context.currentTime); // A3
+              oscillator.frequency.setValueAtTime(
+                220,
+                audioContext.currentTime
+              ); // A3
               break;
             case "POWER_UP_COLLECT":
-              oscillator.frequency.setValueAtTime(880, context.currentTime); // A5
+              oscillator.frequency.setValueAtTime(
+                880,
+                audioContext.currentTime
+              ); // A5
               break;
             case "EXTRA_LIFE_COLLECT":
-              oscillator.frequency.setValueAtTime(1760, context.currentTime); // A6
+              oscillator.frequency.setValueAtTime(
+                1760,
+                audioContext.currentTime
+              ); // A6
               break;
             case "LEVEL_UP":
-              oscillator.frequency.setValueAtTime(1046.5, context.currentTime); // C6
+              oscillator.frequency.setValueAtTime(
+                1046.5,
+                audioContext.currentTime
+              ); // C6
               break;
             case "GAME_OVER":
-              oscillator.frequency.setValueAtTime(110, context.currentTime); // A2
+              oscillator.frequency.setValueAtTime(
+                110,
+                audioContext.currentTime
+              ); // A2
               break;
             case "BLOCK_BREAK":
-              oscillator.frequency.setValueAtTime(660, context.currentTime); // E5
+              oscillator.frequency.setValueAtTime(
+                660,
+                audioContext.currentTime
+              ); // E5
               break;
             case "BLOCK_SLICE":
-              oscillator.frequency.setValueAtTime(550, context.currentTime); // C#5
+              oscillator.frequency.setValueAtTime(
+                550,
+                audioContext.currentTime
+              ); // C#5
               break;
             default:
-              oscillator.frequency.setValueAtTime(440, context.currentTime); // A4
+              oscillator.frequency.setValueAtTime(
+                440,
+                audioContext.currentTime
+              ); // A4
           }
 
-          oscillator.connect(context.destination);
+          oscillator.connect(audioContext.destination);
           oscillator.start();
-          oscillator.stop(context.currentTime + 0.1);
+          oscillator.stop(audioContext.currentTime + 0.1);
         }
+      }
+
+      // Function to initialize audio
+      async function initAudio() {
+        initAudioContext();
+
+        const audioPromises = Object.entries(GAME_CONFIG.AUDIO).map(
+          ([key, url]) => loadAudio(key, url)
+        );
+        await Promise.all(audioPromises);
       }
 
       function initGame() {
@@ -182,11 +227,22 @@
         resetBlockPosition();
         resetPlaceTimeLimit();
 
-        if (AUDIO.BACKGROUND_MUSIC) {
-          AUDIO.BACKGROUND_MUSIC.currentTime = 0;
-          AUDIO.BACKGROUND_MUSIC.play().catch((e) =>
-            console.warn("Failed to play background music", e)
-          );
+        // Initialize audio context if it hasn't been initialized
+        if (!audioContext) {
+          initAudioContext();
+        }
+
+        // Resume audio context if it's suspended
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+
+        if (audioSources.BACKGROUND_MUSIC) {
+          const source = audioContext.createBufferSource();
+          source.buffer = audioSources.BACKGROUND_MUSIC;
+          source.connect(audioContext.destination);
+          source.loop = true;
+          source.start();
         }
       }
 
@@ -235,13 +291,13 @@
       function drawScore() {
         ctx.fillStyle = GAME_CONFIG.TEXT_COLOR;
         ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
-        ctx.fillText(`Score: ${score}`, 10 * scale, 50 * scale); // Adjusted y position
-        ctx.fillText(`Level: ${level}`, 10 * scale, 80 * scale); // Adjusted y position
+        ctx.fillText(`Score: ${score}`, 10 * scale, 50 * scale);
+        ctx.fillText(`Level: ${level}`, 10 * scale, 80 * scale);
         ctx.fillText(
           `Lives: ${lives}/${GAME_CONFIG.MAX_LIVES}`,
           10 * scale,
           110 * scale
-        ); // Adjusted y position
+        );
         drawTimer();
       }
 
@@ -252,7 +308,7 @@
           `Time: ${formatTime(elapsedTime)}`,
           WIDTH - 100 * scale,
           50 * scale
-        ); // Adjusted y position
+        );
       }
 
       function formatTime(ms) {
@@ -331,7 +387,7 @@
         const barWidth = WIDTH - 20 * scale;
         const barHeight = 10 * scale;
         const barX = 10 * scale;
-        const barY = 20 * scale; // Adjusted y position
+        const barY = 20 * scale;
 
         // Draw background
         ctx.fillStyle = "lightgray";
@@ -544,6 +600,11 @@
       function placeBlock() {
         if (gameOver || fallingBlock) return;
 
+        // Resume audio context before playing sound
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+
         if (stack.length === 0) {
           stack.push({ x, y, width: blockWidth });
           playSound("BLOCK_PLACE");
@@ -695,9 +756,6 @@
         tryAgainButton.style.display = "block";
 
         playSound("GAME_OVER");
-        if (AUDIO.BACKGROUND_MUSIC) {
-          AUDIO.BACKGROUND_MUSIC.pause();
-        }
       }
 
       function handleTryAgain() {
@@ -742,9 +800,13 @@
         }
       });
 
-      initAudio();
-      initGame();
-      gameLoop();
+      async function startGame() {
+        await initAudio();
+        initGame();
+        gameLoop();
+      }
+
+      startGame();
     </script>
   </body>
 </html>
