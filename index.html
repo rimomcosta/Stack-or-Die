@@ -20,6 +20,7 @@
         width: 100%;
         max-width: 400px;
         aspect-ratio: 2 / 3;
+        padding-top: 20px;
       }
       canvas {
         width: 100%;
@@ -74,6 +75,9 @@
       let gameOverScreenShown = false;
       let isFlashing = false;
       let flashTimer = 0;
+
+      let placeTimeLimit;
+      let placeTimeRemaining;
 
       const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
       const powerUpImage = GAME_CONFIG.POWER_UP_IMAGE_SRC ? new Image() : null;
@@ -176,6 +180,7 @@
         tryAgainButton.style.display = "none";
         startTime = Date.now();
         resetBlockPosition();
+        resetPlaceTimeLimit();
 
         if (AUDIO.BACKGROUND_MUSIC) {
           AUDIO.BACKGROUND_MUSIC.currentTime = 0;
@@ -183,6 +188,14 @@
             console.warn("Failed to play background music", e)
           );
         }
+      }
+
+      function resetPlaceTimeLimit() {
+        placeTimeLimit =
+          Math.random() *
+            (GAME_CONFIG.MAX_PLACE_TIME - GAME_CONFIG.MIN_PLACE_TIME) +
+          GAME_CONFIG.MIN_PLACE_TIME;
+        placeTimeRemaining = placeTimeLimit;
       }
 
       function resetBlockPosition() {
@@ -222,13 +235,13 @@
       function drawScore() {
         ctx.fillStyle = GAME_CONFIG.TEXT_COLOR;
         ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
-        ctx.fillText(`Score: ${score}`, 10 * scale, 30 * scale);
-        ctx.fillText(`Level: ${level}`, 10 * scale, 60 * scale);
+        ctx.fillText(`Score: ${score}`, 10 * scale, 50 * scale); // Adjusted y position
+        ctx.fillText(`Level: ${level}`, 10 * scale, 80 * scale); // Adjusted y position
         ctx.fillText(
           `Lives: ${lives}/${GAME_CONFIG.MAX_LIVES}`,
           10 * scale,
-          90 * scale
-        );
+          110 * scale
+        ); // Adjusted y position
         drawTimer();
       }
 
@@ -237,9 +250,9 @@
         ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
         ctx.fillText(
           `Time: ${formatTime(elapsedTime)}`,
-          WIDTH - 130 * scale,
-          30 * scale
-        );
+          WIDTH - 100 * scale,
+          50 * scale
+        ); // Adjusted y position
       }
 
       function formatTime(ms) {
@@ -276,6 +289,13 @@
         if (!fallingBlock) {
           moveBlock();
           checkPowerUpCollision();
+
+          // Update remaining time
+          placeTimeRemaining -= 1 / 60; // Assuming 60 FPS
+          if (placeTimeRemaining <= 0) {
+            placeBlock(); // Automatically place the block when time runs out
+            resetPlaceTimeLimit();
+          }
         }
 
         updateFallingBlocks();
@@ -303,8 +323,29 @@
             levelUpTimer = 0;
           }
         }
-
+        drawTimerBar();
         requestAnimationFrame(gameLoop);
+      }
+
+      function drawTimerBar() {
+        const barWidth = WIDTH - 20 * scale;
+        const barHeight = 10 * scale;
+        const barX = 10 * scale;
+        const barY = 20 * scale; // Adjusted y position
+
+        // Draw background
+        ctx.fillStyle = "lightgray";
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+        // Draw remaining time
+        const remainingWidth = (placeTimeRemaining / placeTimeLimit) * barWidth;
+        ctx.fillStyle = "green";
+        ctx.fillRect(barX, barY, remainingWidth, barHeight);
+
+        // Draw border
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2 * scale;
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
       }
 
       function updateFallingBlocks() {
@@ -564,6 +605,7 @@
 
         isPrivileged = false;
         resetBlockPosition();
+        resetPlaceTimeLimit();
       }
 
       function levelUp() {
@@ -576,6 +618,11 @@
 
         stack = [];
         resetBlockPosition();
+        // Decrease time limit
+        GAME_CONFIG.MIN_PLACE_TIME *= GAME_CONFIG.PLACE_TIME_DECREASE_FACTOR;
+        GAME_CONFIG.MAX_PLACE_TIME *= GAME_CONFIG.PLACE_TIME_DECREASE_FACTOR;
+
+        resetPlaceTimeLimit();
       }
 
       function drawLevelUp() {

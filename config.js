@@ -9,6 +9,10 @@ const GAME_CONFIG = {
     INITIAL_BLOCK_WIDTH: 100,
     BLOCK_HEIGHT: 20,
 
+    MIN_PLACE_TIME: 5,  // Minimum time to place a block (in seconds)
+    MAX_PLACE_TIME: 10,  // Maximum time to place a block (in seconds)
+    PLACE_TIME_DECREASE_FACTOR: 0.95,
+
     // Game mechanics
     GRAVITY: 0.5,
     MAX_LIVES: 3,
@@ -17,12 +21,12 @@ const GAME_CONFIG = {
     SNAP_THRESHOLD: 5,
 
     // Power-ups
-    POWER_UP_CHANCE: 0.005,
+    POWER_UP_CHANCE: 0.002,
     POWER_UP_FALL_SPEED: 0.5,
     POWER_UP_WIGGLE_SPEED: 0.05,
     POWER_UP_WIGGLE_AMPLITUDE: 2,
     POWER_UP_RADIUS: 5,
-    EXTRA_LIFE_CHANCE: 0.2,
+    EXTRA_LIFE_CHANCE: 0.1,
 
     // Visuals
     BACKGROUND_COLOR: 'white',
