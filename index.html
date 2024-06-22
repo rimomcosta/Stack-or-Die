@@ -596,6 +596,23 @@
         }
         return false;
       }
+      function calculateScore(blockWidth, newWidth, timeRemaining) {
+        // Base score for placing a block
+        let points = 10;
+
+        // Calculate points lost due to inaccurate placement
+        if (newWidth < blockWidth) {
+          const percentageLost = (blockWidth - newWidth) / blockWidth;
+          const pointsLost = Math.round(10 * percentageLost);
+          points -= pointsLost;
+        }
+
+        // Calculate time bonus
+        const timeBonus = Math.round(10 * (timeRemaining / placeTimeLimit));
+        points += timeBonus;
+
+        return points;
+      }
 
       function placeBlock() {
         if (gameOver || fallingBlock) return;
@@ -605,8 +622,15 @@
           audioContext.resume();
         }
 
+        let pointsEarned = 0;
+
         if (stack.length === 0) {
           stack.push({ x, y, width: blockWidth });
+          pointsEarned = calculateScore(
+            blockWidth,
+            blockWidth,
+            placeTimeRemaining
+          );
           playSound("BLOCK_PLACE");
         } else {
           const prevBlock = stack[stack.length - 1];
@@ -632,6 +656,12 @@
             const newX = isPrivileged ? x : Math.max(x, prevBlock.x);
             stack.push({ x: newX, y, width: newWidth });
 
+            pointsEarned = calculateScore(
+              blockWidth,
+              newWidth,
+              placeTimeRemaining
+            );
+
             if (!isPrivileged && overlap < blockWidth) {
               if (x < newX) {
                 fallingLeftover = { x, y, width: newX - x, vy: 0 };
@@ -649,7 +679,6 @@
             }
 
             blockWidth = newWidth;
-            score++;
 
             if (
               stack.length * GAME_CONFIG.BLOCK_HEIGHT * scale >=
@@ -663,6 +692,9 @@
             return;
           }
         }
+
+        score += pointsEarned;
+        console.log(`Points earned: ${pointsEarned}`); // For debugging, remove in production
 
         isPrivileged = false;
         resetBlockPosition();
