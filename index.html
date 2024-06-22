@@ -56,6 +56,12 @@
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const tryAgainButton = document.getElementById("tryAgainButton");
+      const backgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC
+        ? new Image()
+        : null;
+      if (backgroundImage) {
+        backgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC;
+      }
 
       let WIDTH = GAME_CONFIG.INITIAL_WIDTH;
       let HEIGHT = GAME_CONFIG.INITIAL_HEIGHT;
@@ -99,6 +105,20 @@
         HEIGHT = containerHeight;
 
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
+
+        // Resize background image if it exists
+        if (backgroundImage && backgroundImage.complete) {
+          const imgAspectRatio = backgroundImage.width / backgroundImage.height;
+          const canvasAspectRatio = WIDTH / HEIGHT;
+
+          if (imgAspectRatio > canvasAspectRatio) {
+            backgroundImage.style.width = "100%";
+            backgroundImage.style.height = "auto";
+          } else {
+            backgroundImage.style.width = "auto";
+            backgroundImage.style.height = "100%";
+          }
+        }
       }
 
       // Function to initialize audio context
@@ -268,6 +288,13 @@
       }
 
       function drawBlock(x, y, width, color) {
+        ctx.save();
+
+        // Set shadow properties
+        ctx.shadowColor = "rgba(0, 0, 0, 0.5)"; // Semi-transparent black
+        ctx.shadowBlur = 10 * scale; // Adjust this value to change the softness of the shadow
+        ctx.shadowOffsetY = 5 * scale; // Adjust this value to change the shadow's vertical offset
+
         if (barImage) {
           ctx.drawImage(
             barImage,
@@ -280,11 +307,20 @@
           ctx.fillStyle = color;
           ctx.fillRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         }
+
+        // Reset shadow properties
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
         if (isPrivileged && !fallingBlock) {
           ctx.strokeStyle = "gold";
           ctx.lineWidth = 2 * scale;
           ctx.strokeRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         }
+
+        // Restore the context state
+        ctx.restore();
       }
 
       function drawScore() {
@@ -338,8 +374,15 @@
 
         elapsedTime = Date.now() - startTime;
 
-        ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
+        // ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        if (backgroundImage && backgroundImage.complete) {
+          ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
+        } else {
+          ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
+          ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        }
 
         if (!fallingBlock) {
           moveBlock();
