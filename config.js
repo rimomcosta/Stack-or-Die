@@ -25,8 +25,8 @@ const GAME_CONFIG = {
     POWER_UP_FALL_SPEED: 0.5,
     POWER_UP_WIGGLE_SPEED: 0.05,
     POWER_UP_WIGGLE_AMPLITUDE: 2,
-    POWER_UP_RADIUS: 5,
-    EXTRA_LIFE_CHANCE: 0.1,
+    POWER_UP_RADIUS: 10,
+    EXTRA_LIFE_CHANCE: 0.3,
 
     // Visuals
     BACKGROUND_COLOR: 'white',
@@ -53,7 +53,8 @@ const GAME_CONFIG = {
     // Images
     BACKGROUND_IMAGE_SRC: "background.jpg",
     BAR_IMAGE_SRC: "bricks.jpg",
-    POWER_UP_IMAGE_SRC: null,
+    POWER_UP_IMAGE_SRC: "ball.png",
+    EXTRA_LIFE_IMAGE_SRC: "life.png",
 
     // Audio
     AUDIO: {
