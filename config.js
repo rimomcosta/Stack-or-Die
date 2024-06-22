@@ -51,7 +51,8 @@ const GAME_CONFIG = {
     LEVEL_UP_DISPLAY_DURATION: 120,
 
     // Images
-    BAR_IMAGE_SRC: null,
+    BACKGROUND_IMAGE_SRC: "background.jpg",
+    BAR_IMAGE_SRC: "bricks.jpg",
     POWER_UP_IMAGE_SRC: null,
 
     // Audio
