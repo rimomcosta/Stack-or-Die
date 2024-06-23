@@ -970,18 +970,24 @@
 
       canvas.addEventListener("touchstart", (event) => {
         event.preventDefault();
-        if (gameOver && gameOverScreenShown) {
-          handleTryAgain();
-        } else if (!gameOver) {
+        if (!gameOver && !isPaused) {
           placeBlock();
+        } else if (
+          isPaused &&
+          document.elementFromPoint(
+            event.touches[0].clientX,
+            event.touches[0].clientY
+          ) === pauseButton
+        ) {
+          togglePause();
         }
       });
 
       canvas.addEventListener("mousedown", (event) => {
-        if (gameOver && gameOverScreenShown) {
-          handleTryAgain();
-        } else if (!gameOver) {
+        if (!gameOver && !isPaused) {
           placeBlock();
+        } else if (isPaused && event.target === pauseButton) {
+          togglePause();
         }
       });
 
