@@ -74,7 +74,7 @@
       let gameOverScreenShown = false;
       let isFlashing = false;
       let flashTimer = 0;
-
+      
       let placeTimeLimit;
       let placeTimeRemaining;
 
@@ -316,7 +316,20 @@
         ctx.shadowBlur = 10 * scale;
         ctx.shadowOffsetY = 5 * scale;
 
-        if (barImage) {
+        if (isPrivileged && !fallingBlock) {
+          // Draw a golden block when privileged
+          const gradient = ctx.createLinearGradient(
+            x,
+            y,
+            x + width,
+            y + GAME_CONFIG.BLOCK_HEIGHT * scale
+          );
+          gradient.addColorStop(0, "#FFD700"); // Gold
+          gradient.addColorStop(0.5, "#FFF700"); // Lighter gold
+          gradient.addColorStop(1, "#FFD700"); // Gold
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
+        } else if (barImage) {
           ctx.drawImage(
             barImage,
             x,
@@ -334,7 +347,7 @@
         ctx.shadowOffsetY = 0;
 
         if (isPrivileged && !fallingBlock) {
-          ctx.strokeStyle = "gold";
+          ctx.strokeStyle = "#DAA520"; // Goldenrod
           ctx.lineWidth = 2 * scale;
           ctx.strokeRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         }
@@ -439,6 +452,9 @@
           }
         }
         drawTimerBar();
+        if (gameOver && gameOverScreenShown) {
+          drawGameOverScreen();
+        }
         requestAnimationFrame(gameLoop);
       }
 
@@ -509,6 +525,9 @@
           fallingBlock = null;
           resetBlockPosition();
           resetPlaceTimeLimit();
+          // Reset block width to initial size and set privileged status
+          blockWidth = GAME_CONFIG.INITIAL_BLOCK_WIDTH * scale;
+          isPrivileged = true;
         }
       }
 
@@ -840,13 +859,7 @@
         }
       }
 
-      function showGameOver() {
-        if (gameOverScreenShown) return;
-        gameOverScreenShown = true;
-
-        isFlashing = false;
-        flashTimer = 0;
-
+      function drawGameOverScreen() {
         ctx.fillStyle = GAME_CONFIG.GAME_OVER_OVERLAY_COLOR;
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         ctx.fillStyle = GAME_CONFIG.GAME_OVER_TEXT_COLOR;
@@ -863,7 +876,16 @@
         );
         ctx.textAlign = "left";
         tryAgainButton.style.display = "block";
+      }
 
+      function showGameOver() {
+        if (gameOverScreenShown) return;
+        gameOverScreenShown = true;
+
+        isFlashing = false;
+        flashTimer = 0;
+
+        drawGameOverScreen();
         playSound("GAME_OVER");
       }
 
