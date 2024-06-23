@@ -43,12 +43,30 @@
       #tryAgainButton:hover {
         background-color: #45a049;
       }
+      #pauseButton {
+        position: absolute;
+        left: 85%;
+        top: 12%;
+        transform: translate(-50%, -50%);
+        padding: 5px 10px;
+        font-size: 18px;
+        background-color: #ff9800;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        display: block;
+      }
+      #pauseButton:hover {
+        background-color: #e68900;
+      }
     </style>
   </head>
   <body>
     <div id="gameContainer">
       <canvas id="gameCanvas"></canvas>
       <button id="tryAgainButton">Try Again</button>
+      <button id="pauseButton" tabindex="-1">Pause</button>
     </div>
     <script src="config.js"></script>
     <script>
@@ -56,6 +74,7 @@
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const tryAgainButton = document.getElementById("tryAgainButton");
+      const pauseButton = document.getElementById("pauseButton");
 
       let WIDTH = GAME_CONFIG.INITIAL_WIDTH;
       let HEIGHT = GAME_CONFIG.INITIAL_HEIGHT;
@@ -74,9 +93,15 @@
       let gameOverScreenShown = false;
       let isFlashing = false;
       let flashTimer = 0;
-      
+
       let placeTimeLimit;
       let placeTimeRemaining;
+
+      let animationFrameId;
+
+      let isPaused = false;
+      let pauseStartTime = 0;
+      let totalPausedTime = 0;
 
       const backgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC
         ? new Image()
@@ -92,7 +117,6 @@
       let isPowerUpImageLoaded = false;
       let isExtraLifeImageLoaded = false;
 
-      // Audio context and source nodes
       let audioContext;
       let audioSources = {};
 
@@ -269,6 +293,11 @@
         startTime = Date.now();
         resetBlockPosition();
         resetPlaceTimeLimit();
+        pauseStartTime = 0;
+        totalPausedTime = 0;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
 
         if (!audioContext) {
           initAudioContext();
@@ -285,6 +314,21 @@
           source.loop = true;
           source.start();
         }
+        animationFrameId = requestAnimationFrame(gameLoop);
+      }
+
+      function togglePause() {
+        if (gameOver) return;
+        if (!isPaused) {
+          isPaused = true;
+          pauseStartTime = Date.now();
+          pauseButton.textContent = "Resume";
+        } else {
+          isPaused = false;
+          totalPausedTime += Date.now() - pauseStartTime;
+          pauseButton.textContent = "Pause";
+        }
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
       }
 
       function resetPlaceTimeLimit() {
@@ -317,16 +361,15 @@
         ctx.shadowOffsetY = 5 * scale;
 
         if (isPrivileged && !fallingBlock) {
-          // Draw a golden block when privileged
           const gradient = ctx.createLinearGradient(
             x,
             y,
             x + width,
             y + GAME_CONFIG.BLOCK_HEIGHT * scale
           );
-          gradient.addColorStop(0, "#FFD700"); // Gold
-          gradient.addColorStop(0.5, "#FFF700"); // Lighter gold
-          gradient.addColorStop(1, "#FFD700"); // Gold
+          gradient.addColorStop(0, "#FFD700");
+          gradient.addColorStop(0.5, "#FFF700");
+          gradient.addColorStop(1, "#FFD700");
           ctx.fillStyle = gradient;
           ctx.fillRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         } else if (barImage) {
@@ -347,7 +390,7 @@
         ctx.shadowOffsetY = 0;
 
         if (isPrivileged && !fallingBlock) {
-          ctx.strokeStyle = "#DAA520"; // Goldenrod
+          ctx.strokeStyle = "#DAA520";
           ctx.lineWidth = 2 * scale;
           ctx.strokeRect(x, y, width, GAME_CONFIG.BLOCK_HEIGHT * scale);
         }
@@ -360,11 +403,7 @@
         ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
         ctx.fillText(`Score: ${score}`, 10 * scale, 50 * scale);
         ctx.fillText(`Level: ${level}`, 10 * scale, 80 * scale);
-        ctx.fillText(
-          `Lives: ${lives}/${GAME_CONFIG.MAX_LIVES}`,
-          10 * scale,
-          110 * scale
-        );
+        ctx.fillText(`Lives: ${lives}`, 10 * scale, 110 * scale);
         drawTimer();
       }
 
@@ -401,61 +440,77 @@
       function gameLoop() {
         if (gameOver) {
           showGameOver();
-          return;
-        }
-
-        elapsedTime = Date.now() - startTime;
-
-        ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-        if (backgroundImage && backgroundImage.complete) {
-          ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
-        } else {
-          ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
-          ctx.fillRect(0, 0, WIDTH, HEIGHT);
-        }
-
-        if (!fallingBlock) {
-          moveBlock();
-          checkPowerUpCollision();
-
-          placeTimeRemaining -= 1 / 60;
-          if (placeTimeRemaining <= 0) {
-            placeBlock();
-            resetPlaceTimeLimit();
-          }
-        }
-
-        updateFallingBlocks();
-        updatePowerUps();
-        drawGameState();
-
-        if (isFlashing) {
-          flashTimer++;
-          if (flashTimer <= GAME_CONFIG.FLASH_COUNT * 2) {
-            if (flashTimer % 2 === 1) {
-              ctx.fillStyle = GAME_CONFIG.FLASH_COLOR;
-              ctx.fillRect(0, 0, WIDTH, HEIGHT);
-            }
+        } else if (isPaused) {
+          ctx.clearRect(0, 0, WIDTH, HEIGHT);
+          if (backgroundImage && backgroundImage.complete) {
+            ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
           } else {
-            isFlashing = false;
-            flashTimer = 0;
+            ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
           }
-        }
+          drawGameState();
+          drawPauseScreen();
+        } else {
+          elapsedTime = Date.now() - startTime - totalPausedTime;
 
-        if (showLevelUp) {
-          drawLevelUp();
-          levelUpTimer++;
-          if (levelUpTimer > GAME_CONFIG.LEVEL_UP_DISPLAY_DURATION) {
-            showLevelUp = false;
-            levelUpTimer = 0;
+          ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+          if (backgroundImage && backgroundImage.complete) {
+            ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
+          } else {
+            ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
           }
+
+          if (!fallingBlock) {
+            moveBlock();
+            checkPowerUpCollision();
+
+            placeTimeRemaining -= 1 / 60;
+            if (placeTimeRemaining <= 0) {
+              placeBlock();
+              resetPlaceTimeLimit();
+            }
+          }
+
+          updateFallingBlocks();
+          updatePowerUps();
+          drawGameState();
+
+          if (isFlashing) {
+            flashTimer++;
+            if (flashTimer <= GAME_CONFIG.FLASH_COUNT * 2) {
+              if (flashTimer % 2 === 1) {
+                ctx.fillStyle = GAME_CONFIG.FLASH_COLOR;
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+              }
+            } else {
+              isFlashing = false;
+              flashTimer = 0;
+            }
+          }
+
+          if (showLevelUp) {
+            drawLevelUp();
+            levelUpTimer++;
+            if (levelUpTimer > GAME_CONFIG.LEVEL_UP_DISPLAY_DURATION) {
+              showLevelUp = false;
+              levelUpTimer = 0;
+            }
+          }
+          drawTimerBar();
         }
-        drawTimerBar();
-        if (gameOver && gameOverScreenShown) {
-          drawGameOverScreen();
-        }
-        requestAnimationFrame(gameLoop);
+        animationFrameId = requestAnimationFrame(gameLoop);
+      }
+
+      function drawPauseScreen() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.fillStyle = "white";
+        ctx.font = `${48 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
+        ctx.textAlign = "center";
+        ctx.fillText("PAUSED", WIDTH / 2, HEIGHT / 2 - 20 * scale);
+        ctx.textAlign = "left";
       }
 
       function drawTimerBar() {
@@ -518,6 +573,8 @@
         isFlashing = true;
         flashTimer = 0;
 
+        score = Math.max(0, Math.floor(score * 0.9));
+
         if (lives <= 0) {
           gameOver = true;
           showGameOver();
@@ -525,7 +582,7 @@
           fallingBlock = null;
           resetBlockPosition();
           resetPlaceTimeLimit();
-          // Reset block width to initial size and set privileged status
+
           blockWidth = GAME_CONFIG.INITIAL_BLOCK_WIDTH * scale;
           isPrivileged = true;
         }
@@ -576,7 +633,7 @@
             powerUp.x - GAME_CONFIG.POWER_UP_RADIUS * scale < x + blockWidth
           ) {
             if (powerUp.type === "extraLife") {
-              lives = Math.min(lives + 1, GAME_CONFIG.MAX_LIVES);
+              lives++;
               playSound("EXTRA_LIFE_COLLECT");
             } else {
               const recoveryPercentage = Math.random() * 0.4 + 0.3;
@@ -594,6 +651,8 @@
               playSound("POWER_UP_COLLECT");
               isPrivileged = true;
             }
+
+            score = Math.max(0, Math.floor(score * 0.95));
 
             powerUps.splice(i, 1);
             break;
@@ -891,16 +950,21 @@
 
       function handleTryAgain() {
         initGame();
-        gameLoop();
       }
 
       document.addEventListener("keydown", (event) => {
+        if (event.code === "Space" && document.activeElement === pauseButton) {
+          event.preventDefault();
+        }
+
         if (event.code === "Space") {
           if (gameOver && gameOverScreenShown) {
             handleTryAgain();
-          } else if (!gameOver) {
+          } else if (!gameOver && !isPaused) {
             placeBlock();
           }
+        } else if (event.code === "Escape") {
+          togglePause();
         }
       });
 
@@ -926,8 +990,21 @@
       resizeCanvas();
       window.addEventListener("resize", () => {
         resizeCanvas();
+      });
+
+      pauseButton.addEventListener("click", (event) => {
         if (!gameOver) {
-          initGame();
+          event.preventDefault();
+          togglePause();
+          pauseButton.blur();
+        }
+      });
+
+      pauseButton.addEventListener("touchstart", (event) => {
+        event.preventDefault();
+        if (!gameOver) {
+          togglePause();
+          pauseButton.blur();
         }
       });
 
@@ -935,7 +1012,6 @@
         await initAudio();
         loadPowerUpImages();
         initGame();
-        gameLoop();
       }
 
       startGame();
