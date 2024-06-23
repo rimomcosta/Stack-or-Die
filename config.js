@@ -51,7 +51,7 @@ const GAME_CONFIG = {
     LEVEL_UP_DISPLAY_DURATION: 120,
 
     // Images
-    BACKGROUND_IMAGE_SRC: "background.jpg",
+    BACKGROUND_IMAGE_SRC: "background.png",
     BAR_IMAGE_SRC: "bricks.jpg",
     POWER_UP_IMAGE_SRC: "ball.png",
     EXTRA_LIFE_IMAGE_SRC: "life.png",
