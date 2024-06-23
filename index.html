@@ -523,7 +523,7 @@
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
         const remainingWidth = (placeTimeRemaining / placeTimeLimit) * barWidth;
-        ctx.fillStyle = "green";
+        ctx.fillStyle = GAME_CONFIG.TIME_BAR_COLOR;
         ctx.fillRect(barX, barY, remainingWidth, barHeight);
 
         ctx.strokeStyle = "black";

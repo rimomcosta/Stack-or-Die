@@ -40,6 +40,7 @@ const GAME_CONFIG = {
     GAME_OVER_OVERLAY_COLOR: 'rgba(0, 0, 0, 0.5)',
     GAME_OVER_TEXT_COLOR: 'white',
     FONT_FAMILY: 'Arial, sans-serif',
+    TIME_BAR_COLOR: 'red',
 
     // Effects
     PARTICLE_COUNT: 20,
