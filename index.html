@@ -1372,7 +1372,10 @@
       document.addEventListener("keydown", startMainScreenMusic, {
         once: true,
       });
-      document.addEventListener("keydown", startMainScreenMusic, {
+      document.addEventListener("pointerdown", startMainScreenMusic, {
+        once: true,
+      });
+      document.addEventListener("touchstart", startMainScreenMusic, {
         once: true,
       });
 
@@ -1381,7 +1384,7 @@
       });
 
       window.addEventListener("load", function () {
-        // Create and dispatch a synthetic click event
+        // Create and dispatch synthetic events
         var clickEvent = new MouseEvent("click", {
           view: window,
           bubbles: true,
@@ -1389,26 +1392,26 @@
         });
         document.dispatchEvent(clickEvent);
 
-        // Create and dispatch a synthetic touch event
         var touchEvent = new TouchEvent("touchstart", {
           view: window,
           bubbles: true,
           cancelable: true,
           touches: [
-            new Touch({
-              identifier: Date.now(),
-              target: document.body,
-            }),
+            new Touch({ identifier: Date.now(), target: document.body }),
           ],
           targetTouches: [],
           changedTouches: [
-            new Touch({
-              identifier: Date.now(),
-              target: document.body,
-            }),
+            new Touch({ identifier: Date.now(), target: document.body }),
           ],
         });
         document.dispatchEvent(touchEvent);
+
+        var pointerEvent = new PointerEvent("pointerdown", {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(pointerEvent);
 
         // Attempt to start the audio
         startMainScreenMusic();
