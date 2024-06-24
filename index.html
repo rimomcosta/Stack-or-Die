@@ -144,7 +144,8 @@
       let gameOverScreenShown = false;
       let isFlashing = false;
       let flashTimer = 0;
-
+      let isBackgroundImageLoaded = false;
+      let isMobileBackgroundImageLoaded = false;
       let placeTimeLimit;
       let placeTimeRemaining;
 
@@ -157,15 +158,37 @@
       const backgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC
         ? new Image()
         : null;
-      if (backgroundImage) {
-        backgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC;
-        backgroundImage.onload = () => {
-          drawBackground();
-        };
-      }
+      const mobileBackgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC_MOBILE
+        ? new Image()
+        : null;
 
       const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
       if (barImage) barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
+
+      function loadBackgroundImages() {
+        if (backgroundImage) {
+          backgroundImage.onload = () => {
+            isBackgroundImageLoaded = true;
+            drawBackground();
+          };
+          backgroundImage.onerror = () => {
+            console.warn("Failed to load desktop background image");
+            isBackgroundImageLoaded = false;
+          };
+          backgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC;
+        }
+        if (mobileBackgroundImage) {
+          mobileBackgroundImage.onload = () => {
+            isMobileBackgroundImageLoaded = true;
+            drawBackground();
+          };
+          mobileBackgroundImage.onerror = () => {
+            console.warn("Failed to load mobile background image");
+            isMobileBackgroundImageLoaded = false;
+          };
+          mobileBackgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC_MOBILE;
+        }
+      }
 
       let powerUpImage = null;
       let extraLifeImage = null;
@@ -180,6 +203,8 @@
       let mainScreenMusicBuffer = null;
       let gameOverMusicSource = null;
       let gameOverMusicBuffer = null;
+      let musicStartTime = 0;
+      let musicPausedAt = 0;
       let isLoading = false;
       let hasInteracted = false;
 
@@ -222,8 +247,17 @@
       }
 
       function drawBackground() {
-        if (backgroundImage && backgroundImage.complete) {
-          ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
+        const isMobile = window.innerWidth <= 600;
+        const img = isMobile
+          ? isMobileBackgroundImageLoaded
+            ? mobileBackgroundImage
+            : null
+          : isBackgroundImageLoaded
+          ? backgroundImage
+          : null;
+
+        if (img) {
+          ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
         } else {
           ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
           ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -416,8 +450,24 @@
           backgroundMusicSource.buffer = buffer;
           backgroundMusicSource.loop = true;
           backgroundMusicSource.connect(audioContext.destination);
-          backgroundMusicSource.start(0);
+          backgroundMusicSource.start(0, musicPausedAt);
+          musicStartTime = audioContext.currentTime - musicPausedAt;
           backgroundMusicSource.isPlaying = true;
+        }
+      }
+
+      function pauseBackgroundMusic() {
+        if (backgroundMusicSource && backgroundMusicSource.isPlaying) {
+          backgroundMusicSource.stop();
+          musicPausedAt =
+            (audioContext.currentTime - musicStartTime) %
+            backgroundMusicBuffer.duration;
+          backgroundMusicSource.isPlaying = false;
+        }
+      }
+      function resumeBackgroundMusic() {
+        if (backgroundMusicBuffer) {
+          playBackgroundMusic(backgroundMusicBuffer);
         }
       }
 
@@ -512,16 +562,12 @@
           isPaused = true;
           pauseStartTime = Date.now();
           pauseButton.textContent = GAME_CONFIG.UI.RESUME_BUTTON_TEXT;
-          if (backgroundMusicSource) {
-            backgroundMusicSource.pause();
-          }
+          pauseBackgroundMusic();
         } else {
           isPaused = false;
           totalPausedTime += Date.now() - pauseStartTime;
           pauseButton.textContent = GAME_CONFIG.UI.PAUSE_BUTTON_TEXT;
-          if (backgroundMusicSource) {
-            backgroundMusicSource.resume();
-          }
+          resumeBackgroundMusic();
         }
         drawBackground();
       }
@@ -1127,6 +1173,13 @@
         tryAgainButton.style.display = "block";
       }
 
+      function stopMainScreenMusic() {
+        if (mainScreenMusicSource) {
+          mainScreenMusicSource.stop();
+          mainScreenMusicSource.isPlaying = false;
+        }
+      }
+
       function handleTryAgain() {
         stopAllMusic();
         restartGame();
@@ -1194,6 +1247,7 @@
           if (!hasInteracted) {
             await initAudio();
           }
+          stopMainScreenMusic(); // Add this line to stop main screen music
           loadPowerUpImages();
           initGame();
           hideMainScreen();
@@ -1205,13 +1259,17 @@
             playBackgroundMusic(backgroundMusicBuffer);
           }
 
-          gameStarted = true; // Add this line
+          gameStarted = true;
         } catch (error) {
           console.error("Error starting game:", error);
           loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
         } finally {
           isLoading = false;
           startButton.disabled = false;
+          if (!gameStarted) {
+            gameStarted = true;
+            animationFrameId = requestAnimationFrame(gameLoop);
+          }
         }
       }
 
@@ -1219,7 +1277,9 @@
         if (!hasInteracted) {
           hasInteracted = true;
           initAudio().then(() => {
-            playMainScreenMusic();
+            if (!gameStarted) {
+              playMainScreenMusic();
+            }
           });
         }
       }
@@ -1232,19 +1292,20 @@
         if (event.code === "Space") {
           if (gameOver && gameOverScreenShown) {
             handleTryAgain();
-          } else if (!gameOver && !isPaused) {
+          } else if (gameStarted && !gameOver && !isPaused) {
             placeBlock();
           }
-        } else if (event.code === "Escape") {
+        } else if (event.code === "Escape" && gameStarted) {
           togglePause();
         }
       });
 
       canvas.addEventListener("touchstart", (event) => {
         event.preventDefault();
-        if (!gameOver && !isPaused) {
+        if (gameStarted && !gameOver && !isPaused) {
           placeBlock();
         } else if (
+          gameStarted &&
           isPaused &&
           document.elementFromPoint(
             event.touches[0].clientX,
@@ -1258,9 +1319,9 @@
       mainScreenButton.addEventListener("click", handleMainScreen);
 
       canvas.addEventListener("mousedown", (event) => {
-        if (!gameOver && !isPaused) {
+        if (gameStarted && !gameOver && !isPaused) {
           placeBlock();
-        } else if (isPaused && event.target === pauseButton) {
+        } else if (gameStarted && isPaused && event.target === pauseButton) {
           togglePause();
         }
       });
@@ -1277,6 +1338,7 @@
 
       // Initial setup
       initUI();
+      loadBackgroundImages();
       resizeCanvas();
       window.addEventListener("resize", resizeCanvas);
       showMainScreen();
@@ -1292,6 +1354,19 @@
 
       window.addEventListener("orientationchange", function () {
         setTimeout(resizeCanvas, 100);
+      });
+
+      window.addEventListener("load", function () {
+        // Create and dispatch a synthetic click event
+        var event = new MouseEvent("click", {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(event);
+
+        // Attempt to start the audio
+        startMainScreenMusic();
       });
     </script>
   </body>
