@@ -87,7 +87,7 @@
       }
 
       #tryAgainButton {
-        top: 75%; /* Adjust this value to position it below the Main Screen button */
+        top: 75%;
       }
     </style>
   </head>
@@ -1087,7 +1087,6 @@
         stopAllMusic();
         playGameOverMusic();
 
-        // Show both buttons
         mainScreenButton.style.display = "block";
         tryAgainButton.style.display = "block";
       }
@@ -1104,36 +1103,28 @@
       }
 
       function restartGame() {
-        // Clear the game over screen
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
         gameOverScreenShown = false;
 
-        // Reset game state
         score = 0;
         level = 1;
         lives = GAME_CONFIG.MAX_LIVES;
 
-        // Reinitialize the game
         initGame();
 
-        // Start background music
         if (backgroundMusicBuffer) {
           playBackgroundMusic(backgroundMusicBuffer);
         }
 
-        // Hide both buttons
         tryAgainButton.style.display = "none";
         mainScreenButton.style.display = "none";
 
-        // Ensure the pause button is visible
         pauseButton.style.display = "block";
 
-        // Hide main screen elements
         hideMainScreen();
       }
 
       function showMainScreen() {
-        // Clear the canvas
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
         gameTitle.style.display = "block";
@@ -1143,7 +1134,6 @@
         mainScreenButton.style.display = "none";
         pauseButton.style.display = "none";
 
-        // Redraw the background
         drawBackground();
       }
 
@@ -1167,7 +1157,7 @@
           loadPowerUpImages();
           initGame();
           hideMainScreen();
-          mainScreenButton.style.display = "none"; // Add this line
+          mainScreenButton.style.display = "none";
           loadingIndicator.style.display = "none";
 
           stopAllMusic();
