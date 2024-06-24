@@ -6,11 +6,19 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Stack or Die</title>
     <style>
       body {
         margin: 0;
         padding: 0;
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+        height: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -19,12 +27,12 @@
         font-family: Arial, sans-serif;
       }
       #gameContainer {
-        position: relative;
-        width: 100%;
-        max-width: 400px;
-        margin: 0 auto;
-        aspect-ratio: 2 / 3;
-        max-height: 100vh;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
       }
       canvas {
         width: 100%;
@@ -306,31 +314,28 @@
       }
 
       function resizeCanvas() {
-        const containerWidth = gameContainer.clientWidth;
-        const containerHeight = gameContainer.clientHeight;
+        const containerWidth = window.innerWidth;
+        const containerHeight = isiOSSafari()
+          ? window.innerHeight
+          : gameContainer.clientHeight;
 
         let canvasWidth, canvasHeight;
 
-        if (window.innerWidth <= 600) {
-          // Mobile layout
+        if (window.innerWidth <= 600 || isiOSSafari()) {
+          // Mobile layout or iOS Safari
           canvasWidth = containerWidth;
           canvasHeight = containerHeight;
-
-          if (isiOSSafari()) {
-            // Adjust for iOS Safari
-            const viewportHeight = window.visualViewport
-              ? window.visualViewport.height
-              : window.innerHeight;
-            canvasHeight = viewportHeight;
-          }
         } else {
-          // Desktop layout (unchanged)
+          // Desktop layout
           canvasWidth = Math.min(containerWidth, GAME_CONFIG.INITIAL_WIDTH);
           canvasHeight = canvasWidth / GAME_CONFIG.ASPECT_RATIO;
         }
 
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
+        canvas.style.width = `${canvasWidth}px`;
+        canvas.style.height = `${canvasHeight}px`;
+        canvas.width = canvasWidth * window.devicePixelRatio;
+        canvas.height = canvasHeight * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
         WIDTH = canvasWidth;
         HEIGHT = canvasHeight;
@@ -1415,6 +1420,31 @@
       if (isiOSSafari() && window.visualViewport) {
         window.visualViewport.addEventListener("resize", resizeCanvas);
       }
+      // Call resizeCanvas on load, resize, and orientation change
+      window.addEventListener("load", resizeCanvas);
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("orientationchange", function () {
+        setTimeout(resizeCanvas, 100);
+      });
+
+      // For iOS Safari, also listen to scroll events
+      if (isiOSSafari()) {
+        window.addEventListener("scroll", function () {
+          window.scrollTo(0, 0);
+          resizeCanvas();
+        });
+      }
+
+      // Initial call with a slight delay
+      setTimeout(resizeCanvas, 100);
+
+      document.body.addEventListener(
+        "touchmove",
+        function (e) {
+          e.preventDefault();
+        },
+        { passive: false }
+      );
     </script>
   </body>
 </html>
