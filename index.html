@@ -1350,6 +1350,7 @@
           }
 
           gameStarted = true;
+          pauseButton.style.display = "block"; // Ensure the pause button is visible
         } catch (error) {
           console.error("Error starting game:", error);
           loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
