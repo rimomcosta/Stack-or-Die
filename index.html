@@ -495,46 +495,35 @@
       }
 
       async function initAudio() {
-        if (!audioContext) {
-          audioContext = new (window.AudioContext ||
-            window.webkitAudioContext)();
-        }
+        const audioPromises = Object.entries(GAME_CONFIG.AUDIO).map(
+          ([key, url]) => loadAudio(key, url)
+        );
+        await Promise.all(audioPromises);
 
-        if (Object.keys(audioSources).length === 0) {
-          const audioPromises = Object.entries(GAME_CONFIG.AUDIO).map(
-            ([key, url]) => loadAudio(key, url)
-          );
-          await Promise.all(audioPromises);
-
-          backgroundMusicBuffer = audioSources["BACKGROUND_MUSIC"];
-          mainScreenMusicBuffer = audioSources["MAIN_SCREEN_MUSIC"];
-          gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
-        }
-
-        // Create and load a short silent audio buffer for "warming up" the audio context
-        const silentBuffer = audioContext.createBuffer(1, 1, 22050);
-        const source = audioContext.createBufferSource();
-        source.buffer = silentBuffer;
-        source.connect(audioContext.destination);
-        source.start();
-
-        return audioContext.resume();
+        backgroundMusicBuffer = audioSources["BACKGROUND_MUSIC"];
+        mainScreenMusicBuffer = audioSources["MAIN_SCREEN_MUSIC"];
+        gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
       }
 
-      async function playBackgroundMusic(buffer) {
-        if (!buffer) {
-          console.warn("No background music buffer available");
+      function playBackgroundMusic(buffer) {
+        if (!buffer || !audioContext) {
+          console.warn(
+            "Cannot play background music: buffer or audio context not available"
+          );
           return;
         }
 
-        // Ensure the audio context is in the right state
         if (audioContext.state !== "running") {
-          try {
-            await audioContext.resume();
-          } catch (error) {
-            console.error("Failed to resume audio context:", error);
-            return;
-          }
+          console.warn("Audio context is not running. Attempting to resume.");
+          audioContext
+            .resume()
+            .then(() => {
+              playBackgroundMusic(buffer); // Retry after resuming
+            })
+            .catch((error) => {
+              console.error("Failed to resume audio context:", error);
+            });
+          return;
         }
 
         if (!backgroundMusicSource || !backgroundMusicSource.isPlaying) {
@@ -1400,10 +1389,24 @@
         isLoading = true;
         startButton.disabled = true;
         loadingIndicator.style.display = "block";
-        loadingIndicator.textContent = "Preparing audio...";
+        loadingIndicator.textContent = "Starting game...";
 
         try {
-          await initAudio(); // Ensure audio is initialized and loaded
+          // Initialize audio context if it hasn't been already
+          if (!audioContext) {
+            audioContext = new (window.AudioContext ||
+              window.webkitAudioContext)();
+          }
+
+          // Ensure the audio context is running
+          if (audioContext.state !== "running") {
+            await audioContext.resume();
+          }
+
+          // Load audio if it hasn't been loaded yet
+          if (Object.keys(audioSources).length === 0) {
+            await initAudio();
+          }
 
           stopAllMusic();
           loadPowerUpImages();
@@ -1411,8 +1414,9 @@
           hideMainScreen();
           mainScreenButton.style.display = "none";
 
+          // Start background music
           if (backgroundMusicBuffer) {
-            await playBackgroundMusic(backgroundMusicBuffer);
+            playBackgroundMusic(backgroundMusicBuffer);
           } else {
             console.warn("Background music buffer not loaded");
           }
@@ -1588,9 +1592,6 @@
       if (window.visualViewport) {
         window.visualViewport.addEventListener("resize", resizeCanvas);
       }
-
-      // At the end of your initial setup code
-      initAudio().catch(console.error);
 
       // Add this to handle the first user interaction
       document.addEventListener(
