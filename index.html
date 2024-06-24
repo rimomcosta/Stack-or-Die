@@ -511,14 +511,25 @@
           gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
         }
 
-        await audioContext.resume();
+        return audioContext.resume();
       }
 
-      function playBackgroundMusic(buffer) {
-        if (
-          buffer &&
-          (!backgroundMusicSource || !backgroundMusicSource.isPlaying)
-        ) {
+      async function playBackgroundMusic(buffer) {
+        if (!buffer) {
+          console.warn("No background music buffer available");
+          return;
+        }
+
+        if (audioContext.state === "suspended") {
+          try {
+            await audioContext.resume();
+          } catch (error) {
+            console.error("Failed to resume audio context:", error);
+            return;
+          }
+        }
+
+        if (!backgroundMusicSource || !backgroundMusicSource.isPlaying) {
           if (backgroundMusicSource) {
             backgroundMusicSource.stop();
           }
@@ -1383,8 +1394,22 @@
         loadingIndicator.style.display = "block";
 
         try {
-          // Always initialize audio, even if it's already been initialized
-          await initAudio();
+          // Initialize audio context if it hasn't been already
+          if (!audioContext) {
+            audioContext = new (window.AudioContext ||
+              window.webkitAudioContext)();
+          }
+
+          // If the audio context is in a suspended state, try to resume it
+          if (audioContext.state === "suspended") {
+            await audioContext.resume();
+          }
+
+          // Load audio if it hasn't been loaded yet
+          if (Object.keys(audioSources).length === 0) {
+            await initAudio();
+          }
+
           hasInteracted = true;
 
           stopAllMusic(); // Stop any currently playing music
@@ -1396,7 +1421,6 @@
 
           // Ensure background music starts
           if (backgroundMusicBuffer) {
-            await audioContext.resume(); // Ensure audio context is running
             playBackgroundMusic(backgroundMusicBuffer);
           } else {
             console.warn("Background music buffer not loaded");
