@@ -1192,34 +1192,87 @@
 
       function createBreakParticles(block) {
         playSound("BLOCK_BREAK");
-        for (let i = 0; i < GAME_CONFIG.PARTICLE_COUNT; i++) {
+        const minParticleSize =
+          GAME_CONFIG.BLOCK_HEIGHT *
+          scale *
+          GAME_CONFIG.MIN_PARTICLE_SIZE_RATIO;
+        const maxParticleSize =
+          GAME_CONFIG.BLOCK_HEIGHT *
+          scale *
+          GAME_CONFIG.MAX_PARTICLE_SIZE_RATIO;
+        const particlesToCreate = Math.min(
+          GAME_CONFIG.MAX_PARTICLES,
+          Math.floor(
+            (block.width * GAME_CONFIG.BLOCK_HEIGHT * scale) /
+              (minParticleSize * minParticleSize)
+          )
+        );
+
+        for (let i = 0; i < particlesToCreate; i++) {
+          const size =
+            Math.random() * (maxParticleSize - minParticleSize) +
+            minParticleSize;
+          const x = block.x + Math.random() * (block.width - size);
+          const y =
+            block.y + Math.random() * (GAME_CONFIG.BLOCK_HEIGHT * scale - size);
+
           BREAK_PARTICLES.push({
-            x: block.x + Math.random() * block.width,
-            y: block.y + Math.random() * GAME_CONFIG.BLOCK_HEIGHT * scale,
+            x: x,
+            y: y,
             vx: (Math.random() - 0.5) * 5 * scale,
             vy: (Math.random() - 0.5) * 5 * scale,
-            radius: Math.random() * 3 * scale + 1,
-            color: GAME_CONFIG.BLOCK_COLOR,
+            size: size,
+            sourceX: x - block.x,
+            sourceY: y - block.y,
+            rotation: Math.random() * Math.PI * 2,
+            angularVelocity: (Math.random() - 0.5) * 0.2,
           });
         }
       }
 
       function updateAndDrawParticles() {
+        ctx.save();
+        ctx.shadowColor = GAME_CONFIG.PARTICLE_SHADOW_COLOR;
+        ctx.shadowBlur = GAME_CONFIG.PARTICLE_SHADOW_BLUR * scale;
+        ctx.shadowOffsetX = GAME_CONFIG.PARTICLE_SHADOW_OFFSET_X * scale;
+        ctx.shadowOffsetY = GAME_CONFIG.PARTICLE_SHADOW_OFFSET_Y * scale;
+
         for (let i = BREAK_PARTICLES.length - 1; i >= 0; i--) {
           let p = BREAK_PARTICLES[i];
           p.x += p.vx;
           p.y += p.vy;
           p.vy += GAME_CONFIG.GRAVITY * scale * 0.2;
+          p.rotation += p.angularVelocity;
 
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.fill();
+          ctx.save();
+          ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
+          ctx.rotate(p.rotation);
+
+          if (barImage) {
+            ctx.drawImage(
+              barImage,
+              p.sourceX,
+              p.sourceY,
+              p.size,
+              p.size,
+              -p.size / 2,
+              -p.size / 2,
+              p.size,
+              p.size
+            );
+          } else {
+            ctx.fillStyle = GAME_CONFIG.BLOCK_COLOR;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          }
+
+          ctx.restore();
 
           if (p.y > HEIGHT) {
             BREAK_PARTICLES.splice(i, 1);
           }
         }
+
+        ctx.restore(); // Restore the original context state
       }
 
       function drawGameOverScreen() {
