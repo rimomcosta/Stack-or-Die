@@ -100,6 +100,12 @@
           height: 100vh;
         }
       }
+      @supports (-webkit-touch-callout: none) {
+        #gameContainer {
+          height: 100svh; /* Use svh (safe viewport height) for iOS Safari */
+          max-height: 100svh;
+        }
+      }
     </style>
   </head>
   <body>
