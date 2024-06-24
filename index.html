@@ -495,16 +495,23 @@
       }
 
       async function initAudio() {
-        initAudioContext();
+        if (!audioContext) {
+          audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+        }
 
-        const audioPromises = Object.entries(GAME_CONFIG.AUDIO).map(
-          ([key, url]) => loadAudio(key, url)
-        );
-        await Promise.all(audioPromises);
+        if (Object.keys(audioSources).length === 0) {
+          const audioPromises = Object.entries(GAME_CONFIG.AUDIO).map(
+            ([key, url]) => loadAudio(key, url)
+          );
+          await Promise.all(audioPromises);
 
-        backgroundMusicBuffer = audioSources["BACKGROUND_MUSIC"];
-        mainScreenMusicBuffer = audioSources["MAIN_SCREEN_MUSIC"];
-        gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
+          backgroundMusicBuffer = audioSources["BACKGROUND_MUSIC"];
+          mainScreenMusicBuffer = audioSources["MAIN_SCREEN_MUSIC"];
+          gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
+        }
+
+        await audioContext.resume();
       }
 
       function playBackgroundMusic(buffer) {
@@ -1323,23 +1330,26 @@
         loadingIndicator.style.display = "block";
 
         try {
-          if (!hasInteracted) {
-            await initAudio();
-          }
-          stopMainScreenMusic(); // Add this line to stop main screen music
+          // Always initialize audio, even if it's already been initialized
+          await initAudio();
+          hasInteracted = true;
+
+          stopAllMusic(); // Stop any currently playing music
           loadPowerUpImages();
           initGame();
           hideMainScreen();
           mainScreenButton.style.display = "none";
           loadingIndicator.style.display = "none";
 
-          stopAllMusic();
+          // Ensure background music starts
           if (backgroundMusicBuffer) {
+            await audioContext.resume(); // Ensure audio context is running
             playBackgroundMusic(backgroundMusicBuffer);
+          } else {
+            console.warn("Background music buffer not loaded");
           }
 
           gameStarted = true;
-          pauseButton.style.display = "block"; // Ensure the pause button is visible
         } catch (error) {
           console.error("Error starting game:", error);
           loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
