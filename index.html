@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Responsive Stacking Game</title>
+    <title>Stack or Die</title>
     <style>
       body {
         margin: 0;
@@ -26,55 +26,94 @@
         height: 100%;
         display: block;
       }
-      #tryAgainButton {
+      #gameTitle {
         position: absolute;
+        top: 10%;
         left: 50%;
-        top: 75%;
-        transform: translate(-50%, -50%);
-        padding: 10px 20px;
+        transform: translateX(-50%);
+        font-size: 30px;
+        text-align: center;
+      }
+      #instructions {
+        position: absolute;
+        top: 65%;
+        left: 50%;
+        transform: translateX(-50%);
         font-size: 18px;
-        background-color: #4caf50;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
+        text-align: center;
         display: none;
       }
-      #tryAgainButton:hover {
-        background-color: #45a049;
-      }
-      #pauseButton {
+      .button {
         position: absolute;
-        left: 85%;
-        top: 12%;
-        transform: translate(-50%, -50%);
-        padding: 5px 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
         font-size: 18px;
-        background-color: #ff9800;
-        color: white;
         border: none;
         border-radius: 5px;
         cursor: pointer;
-        display: block;
       }
-      #pauseButton:hover {
-        background-color: #e68900;
+      #startButton {
+        top: 50%;
+      }
+      #tryAgainButton {
+        top: 75%;
+        display: none;
+      }
+      #pauseButton {
+        right: 10px;
+        top: 40px;
+        left: auto;
+        transform: none;
+        padding: 5px 10px;
+        display: none;
+        min-width: 80px;
+        text-align: center;
+      }
+      #loadingIndicator {
+        position: absolute;
+        left: 50%;
+        top: 60%;
+        transform: translate(-50%, -50%);
+        font-size: 18px;
+        display: none;
+      }
+      #mainScreenButton {
+        position: absolute;
+        left: 50%;
+        top: 65%;
+        transform: translateX(-50%);
+        display: none;
+      }
+
+      #tryAgainButton {
+        top: 75%; /* Adjust this value to position it below the Main Screen button */
       }
     </style>
   </head>
   <body>
     <div id="gameContainer">
       <canvas id="gameCanvas"></canvas>
-      <button id="tryAgainButton">Try Again</button>
-      <button id="pauseButton" tabindex="-1">Pause</button>
+      <h1 id="gameTitle"></h1>
+      <button id="startButton" class="button"></button>
+      <div id="instructions"></div>
+      <button id="mainScreenButton" class="button">Main Screen</button>
+      <button id="tryAgainButton" class="button"></button>
+      <button id="pauseButton" class="button" tabindex="-1"></button>
+      <div id="loadingIndicator"></div>
     </div>
     <script src="config.js"></script>
     <script>
       const gameContainer = document.getElementById("gameContainer");
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
+      const gameTitle = document.getElementById("gameTitle");
+      const instructions = document.getElementById("instructions");
+      const startButton = document.getElementById("startButton");
       const tryAgainButton = document.getElementById("tryAgainButton");
       const pauseButton = document.getElementById("pauseButton");
+      const loadingIndicator = document.getElementById("loadingIndicator");
+      const mainScreenButton = document.getElementById("mainScreenButton");
 
       let WIDTH = GAME_CONFIG.INITIAL_WIDTH;
       let HEIGHT = GAME_CONFIG.INITIAL_HEIGHT;
@@ -106,8 +145,12 @@
       const backgroundImage = GAME_CONFIG.BACKGROUND_IMAGE_SRC
         ? new Image()
         : null;
-      if (backgroundImage)
+      if (backgroundImage) {
         backgroundImage.src = GAME_CONFIG.BACKGROUND_IMAGE_SRC;
+        backgroundImage.onload = () => {
+          drawBackground();
+        };
+      }
 
       const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
       if (barImage) barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
@@ -119,6 +162,61 @@
 
       let audioContext;
       let audioSources = {};
+      let backgroundMusicSource = null;
+      let backgroundMusicBuffer = null;
+      let mainScreenMusicSource = null;
+      let mainScreenMusicBuffer = null;
+      let gameOverMusicSource = null;
+      let gameOverMusicBuffer = null;
+      let isLoading = false;
+      let hasInteracted = false;
+
+      function initUI() {
+        gameTitle.textContent = GAME_CONFIG.GAME_TITLE;
+        gameTitle.style.color = GAME_CONFIG.STYLES.TITLE_COLOR;
+
+        instructions.innerHTML = GAME_CONFIG.INSTRUCTIONS.join("<br>");
+        instructions.style.color = GAME_CONFIG.STYLES.INSTRUCTIONS_COLOR;
+
+        startButton.textContent = GAME_CONFIG.UI.START_BUTTON_TEXT;
+        tryAgainButton.textContent = GAME_CONFIG.UI.TRY_AGAIN_BUTTON_TEXT;
+        pauseButton.textContent = GAME_CONFIG.UI.PAUSE_BUTTON_TEXT;
+        loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_TEXT;
+
+        const buttons = document.querySelectorAll(".button");
+        buttons.forEach((button) => {
+          button.style.backgroundColor =
+            GAME_CONFIG.STYLES.BUTTON_BACKGROUND_COLOR;
+          button.style.color = GAME_CONFIG.STYLES.BUTTON_TEXT_COLOR;
+        });
+
+        pauseButton.style.backgroundColor =
+          GAME_CONFIG.STYLES.PAUSE_BUTTON_BACKGROUND_COLOR;
+
+        buttons.forEach((button) => {
+          button.addEventListener("mouseover", function () {
+            this.style.backgroundColor =
+              this === pauseButton
+                ? GAME_CONFIG.STYLES.PAUSE_BUTTON_HOVER_BACKGROUND_COLOR
+                : GAME_CONFIG.STYLES.BUTTON_HOVER_BACKGROUND_COLOR;
+          });
+          button.addEventListener("mouseout", function () {
+            this.style.backgroundColor =
+              this === pauseButton
+                ? GAME_CONFIG.STYLES.PAUSE_BUTTON_BACKGROUND_COLOR
+                : GAME_CONFIG.STYLES.BUTTON_BACKGROUND_COLOR;
+          });
+        });
+      }
+
+      function drawBackground() {
+        if (backgroundImage && backgroundImage.complete) {
+          ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
+        } else {
+          ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
+          ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        }
+      }
 
       function loadPowerUpImages() {
         if (GAME_CONFIG.POWER_UP_IMAGE_SRC) {
@@ -160,18 +258,7 @@
 
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
 
-        if (backgroundImage && backgroundImage.complete) {
-          const imgAspectRatio = backgroundImage.width / backgroundImage.height;
-          const canvasAspectRatio = WIDTH / HEIGHT;
-
-          if (imgAspectRatio > canvasAspectRatio) {
-            backgroundImage.style.width = "100%";
-            backgroundImage.style.height = "auto";
-          } else {
-            backgroundImage.style.width = "auto";
-            backgroundImage.style.height = "100%";
-          }
-        }
+        drawBackground();
       }
 
       function initAudioContext() {
@@ -179,12 +266,18 @@
       }
 
       async function loadAudio(key, url) {
-        if (!url) return;
+        if (!url) return null;
 
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        audioSources[key] = audioBuffer;
+        try {
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          audioSources[key] = audioBuffer;
+          return audioBuffer;
+        } catch (error) {
+          console.warn(`Failed to load audio: ${key}`, error);
+          return null;
+        }
       }
 
       function playSound(sound) {
@@ -270,6 +363,76 @@
           ([key, url]) => loadAudio(key, url)
         );
         await Promise.all(audioPromises);
+
+        backgroundMusicBuffer = audioSources["BACKGROUND_MUSIC"];
+        mainScreenMusicBuffer = audioSources["MAIN_SCREEN_MUSIC"];
+        gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
+      }
+
+      function playBackgroundMusic(buffer) {
+        if (
+          buffer &&
+          (!backgroundMusicSource || !backgroundMusicSource.isPlaying)
+        ) {
+          if (backgroundMusicSource) {
+            backgroundMusicSource.stop();
+          }
+          backgroundMusicSource = audioContext.createBufferSource();
+          backgroundMusicSource.buffer = buffer;
+          backgroundMusicSource.loop = true;
+          backgroundMusicSource.connect(audioContext.destination);
+          backgroundMusicSource.start(0);
+          backgroundMusicSource.isPlaying = true;
+        }
+      }
+
+      function playMainScreenMusic() {
+        if (
+          mainScreenMusicBuffer &&
+          (!mainScreenMusicSource || !mainScreenMusicSource.isPlaying)
+        ) {
+          if (mainScreenMusicSource) {
+            mainScreenMusicSource.stop();
+          }
+          mainScreenMusicSource = audioContext.createBufferSource();
+          mainScreenMusicSource.buffer = mainScreenMusicBuffer;
+          mainScreenMusicSource.loop = true;
+          mainScreenMusicSource.connect(audioContext.destination);
+          mainScreenMusicSource.start(0);
+          mainScreenMusicSource.isPlaying = true;
+        }
+      }
+
+      function playGameOverMusic() {
+        if (
+          gameOverMusicBuffer &&
+          (!gameOverMusicSource || !gameOverMusicSource.isPlaying)
+        ) {
+          if (gameOverMusicSource) {
+            gameOverMusicSource.stop();
+          }
+          gameOverMusicSource = audioContext.createBufferSource();
+          gameOverMusicSource.buffer = gameOverMusicBuffer;
+          gameOverMusicSource.loop = true;
+          gameOverMusicSource.connect(audioContext.destination);
+          gameOverMusicSource.start(0);
+          gameOverMusicSource.isPlaying = true;
+        }
+      }
+
+      function stopAllMusic() {
+        if (backgroundMusicSource) {
+          backgroundMusicSource.stop();
+          backgroundMusicSource.isPlaying = false;
+        }
+        if (mainScreenMusicSource) {
+          mainScreenMusicSource.stop();
+          mainScreenMusicSource.isPlaying = false;
+        }
+        if (gameOverMusicSource) {
+          gameOverMusicSource.stop();
+          gameOverMusicSource.isPlaying = false;
+        }
       }
 
       function initGame() {
@@ -299,21 +462,11 @@
           cancelAnimationFrame(animationFrameId);
         }
 
-        if (!audioContext) {
-          initAudioContext();
-        }
-
-        if (audioContext.state === "suspended") {
+        if (audioContext && audioContext.state === "suspended") {
           audioContext.resume();
         }
 
-        if (audioSources.BACKGROUND_MUSIC) {
-          const source = audioContext.createBufferSource();
-          source.buffer = audioSources.BACKGROUND_MUSIC;
-          source.connect(audioContext.destination);
-          source.loop = true;
-          source.start();
-        }
+        pauseButton.style.display = "block";
         animationFrameId = requestAnimationFrame(gameLoop);
       }
 
@@ -322,13 +475,19 @@
         if (!isPaused) {
           isPaused = true;
           pauseStartTime = Date.now();
-          pauseButton.textContent = "Resume";
+          pauseButton.textContent = GAME_CONFIG.UI.RESUME_BUTTON_TEXT;
+          if (backgroundMusicSource) {
+            backgroundMusicSource.pause();
+          }
         } else {
           isPaused = false;
           totalPausedTime += Date.now() - pauseStartTime;
-          pauseButton.textContent = "Pause";
+          pauseButton.textContent = GAME_CONFIG.UI.PAUSE_BUTTON_TEXT;
+          if (backgroundMusicSource) {
+            backgroundMusicSource.resume();
+          }
         }
-        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        drawBackground();
       }
 
       function resetPlaceTimeLimit() {
@@ -401,20 +560,17 @@
       function drawScore() {
         ctx.fillStyle = GAME_CONFIG.TEXT_COLOR;
         ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
-        ctx.fillText(`Score: ${score}`, 10 * scale, 50 * scale);
-        ctx.fillText(`Level: ${level}`, 10 * scale, 80 * scale);
-        ctx.fillText(`Lives: ${lives}`, 10 * scale, 110 * scale);
-        drawTimer();
-      }
+        ctx.textAlign = "left";
 
-      function drawTimer() {
-        ctx.fillStyle = GAME_CONFIG.TEXT_COLOR;
-        ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
-        ctx.fillText(
-          `Time: ${formatTime(elapsedTime)}`,
-          WIDTH - 100 * scale,
-          50 * scale
-        );
+        ctx.fillText(`Score: ${score}`, 10 * scale, 30 * scale);
+        ctx.fillText(`Level: ${level}`, 10 * scale, 55 * scale);
+        ctx.fillText(`Lives: ${lives}`, 10 * scale, 80 * scale);
+
+        ctx.textAlign = "right";
+        const timeText = `Time: ${formatTime(elapsedTime)}`;
+        ctx.fillText(timeText, WIDTH - 10 * scale, 30 * scale);
+
+        ctx.textAlign = "left";
       }
 
       function formatTime(ms) {
@@ -441,26 +597,13 @@
         if (gameOver) {
           showGameOver();
         } else if (isPaused) {
-          ctx.clearRect(0, 0, WIDTH, HEIGHT);
-          if (backgroundImage && backgroundImage.complete) {
-            ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
-          } else {
-            ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
-            ctx.fillRect(0, 0, WIDTH, HEIGHT);
-          }
+          drawBackground();
           drawGameState();
           drawPauseScreen();
         } else {
           elapsedTime = Date.now() - startTime - totalPausedTime;
 
-          ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-          if (backgroundImage && backgroundImage.complete) {
-            ctx.drawImage(backgroundImage, 0, 0, WIDTH, HEIGHT);
-          } else {
-            ctx.fillStyle = GAME_CONFIG.BACKGROUND_COLOR;
-            ctx.fillRect(0, 0, WIDTH, HEIGHT);
-          }
+          drawBackground();
 
           if (!fallingBlock) {
             moveBlock();
@@ -504,9 +647,9 @@
       }
 
       function drawPauseScreen() {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillStyle = GAME_CONFIG.GAME_OVER_OVERLAY_COLOR;
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
-        ctx.fillStyle = "white";
+        ctx.fillStyle = GAME_CONFIG.GAME_OVER_TEXT_COLOR;
         ctx.font = `${48 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
         ctx.textAlign = "center";
         ctx.fillText("PAUSED", WIDTH / 2, HEIGHT / 2 - 20 * scale);
@@ -514,21 +657,14 @@
       }
 
       function drawTimerBar() {
-        const barWidth = WIDTH - 20 * scale;
         const barHeight = 10 * scale;
-        const barX = 10 * scale;
-        const barY = 20 * scale;
 
         ctx.fillStyle = "lightgray";
-        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillRect(0, 0, WIDTH, barHeight);
 
-        const remainingWidth = (placeTimeRemaining / placeTimeLimit) * barWidth;
+        const remainingWidth = (placeTimeRemaining / placeTimeLimit) * WIDTH;
         ctx.fillStyle = GAME_CONFIG.TIME_BAR_COLOR;
-        ctx.fillRect(barX, barY, remainingWidth, barHeight);
-
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 2 * scale;
-        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        ctx.fillRect(0, 0, remainingWidth, barHeight);
       }
 
       function updateFallingBlocks() {
@@ -946,10 +1082,114 @@
 
         drawGameOverScreen();
         playSound("GAME_OVER");
+        pauseButton.style.display = "none";
+
+        stopAllMusic();
+        playGameOverMusic();
+
+        // Show both buttons
+        mainScreenButton.style.display = "block";
+        tryAgainButton.style.display = "block";
       }
 
       function handleTryAgain() {
+        stopAllMusic();
+        restartGame();
+      }
+
+      function handleMainScreen() {
+        stopAllMusic();
+        showMainScreen();
+        playMainScreenMusic();
+      }
+
+      function restartGame() {
+        // Clear the game over screen
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        gameOverScreenShown = false;
+
+        // Reset game state
+        score = 0;
+        level = 1;
+        lives = GAME_CONFIG.MAX_LIVES;
+
+        // Reinitialize the game
         initGame();
+
+        // Start background music
+        if (backgroundMusicBuffer) {
+          playBackgroundMusic(backgroundMusicBuffer);
+        }
+
+        // Hide both buttons
+        tryAgainButton.style.display = "none";
+        mainScreenButton.style.display = "none";
+
+        // Ensure the pause button is visible
+        pauseButton.style.display = "block";
+
+        // Hide main screen elements
+        hideMainScreen();
+      }
+
+      function showMainScreen() {
+        // Clear the canvas
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        gameTitle.style.display = "block";
+        startButton.style.display = "block";
+        instructions.style.display = "block";
+        tryAgainButton.style.display = "none";
+        mainScreenButton.style.display = "none";
+        pauseButton.style.display = "none";
+
+        // Redraw the background
+        drawBackground();
+      }
+
+      function hideMainScreen() {
+        gameTitle.style.display = "none";
+        startButton.style.display = "none";
+        instructions.style.display = "none";
+      }
+
+      async function startGame() {
+        if (isLoading) return;
+
+        isLoading = true;
+        startButton.disabled = true;
+        loadingIndicator.style.display = "block";
+
+        try {
+          if (!hasInteracted) {
+            await initAudio();
+          }
+          loadPowerUpImages();
+          initGame();
+          hideMainScreen();
+          mainScreenButton.style.display = "none"; // Add this line
+          loadingIndicator.style.display = "none";
+
+          stopAllMusic();
+          if (backgroundMusicBuffer) {
+            playBackgroundMusic(backgroundMusicBuffer);
+          }
+        } catch (error) {
+          console.error("Error starting game:", error);
+          loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
+        } finally {
+          isLoading = false;
+          startButton.disabled = false;
+        }
+      }
+
+      function startMainScreenMusic() {
+        if (!hasInteracted) {
+          hasInteracted = true;
+          initAudio().then(() => {
+            playMainScreenMusic();
+          });
+        }
       }
 
       document.addEventListener("keydown", (event) => {
@@ -983,6 +1223,8 @@
         }
       });
 
+      mainScreenButton.addEventListener("click", handleMainScreen);
+
       canvas.addEventListener("mousedown", (event) => {
         if (!gameOver && !isPaused) {
           placeBlock();
@@ -992,12 +1234,7 @@
       });
 
       tryAgainButton.addEventListener("click", handleTryAgain);
-
-      resizeCanvas();
-      window.addEventListener("resize", () => {
-        resizeCanvas();
-      });
-
+      startButton.addEventListener("click", startGame);
       pauseButton.addEventListener("click", (event) => {
         if (!gameOver) {
           event.preventDefault();
@@ -1006,21 +1243,17 @@
         }
       });
 
-      pauseButton.addEventListener("touchstart", (event) => {
-        event.preventDefault();
-        if (!gameOver) {
-          togglePause();
-          pauseButton.blur();
-        }
+      // Initial setup
+      initUI();
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+      showMainScreen();
+
+      // Start main screen music on first interaction
+      document.addEventListener("click", startMainScreenMusic, { once: true });
+      document.addEventListener("keydown", startMainScreenMusic, {
+        once: true,
       });
-
-      async function startGame() {
-        await initAudio();
-        loadPowerUpImages();
-        initGame();
-      }
-
-      startGame();
     </script>
   </body>
 </html>

@@ -1,4 +1,14 @@
 const GAME_CONFIG = {
+    // Game title
+    GAME_TITLE: "Stack or Die",
+
+    // Instructions
+    INSTRUCTIONS: [
+        "Stack the blocks as high as you can!",
+        '',
+        "Click or press space to place a block.",
+    ],
+
     // Canvas and scaling
     INITIAL_WIDTH: 400,
     INITIAL_HEIGHT: 600,
@@ -59,7 +69,9 @@ const GAME_CONFIG = {
 
     // Audio
     AUDIO: {
-        BACKGROUND_MUSIC: null,
+        BACKGROUND_MUSIC: "https://main--stackordie.netlify.app/stackordie.mp3",
+        MAIN_SCREEN_MUSIC: "https://main--stackordie.netlify.app/mainscreen.mp3",
+        GAME_OVER_MUSIC: "https://main--stackordie.netlify.app/gameover.mp3",
         BLOCK_PLACE: null,
         BLOCK_FALL: null,
         POWER_UP_COLLECT: null,
@@ -70,5 +82,25 @@ const GAME_CONFIG = {
         EDGE_RIGHT: null,
         BLOCK_BREAK: null,
         BLOCK_SLICE: null,
+    },
+
+    // UI Elements
+    UI: {
+        START_BUTTON_TEXT: "Start Game",
+        TRY_AGAIN_BUTTON_TEXT: "Try Again",
+        PAUSE_BUTTON_TEXT: "Pause",
+        RESUME_BUTTON_TEXT: "Resume",
+        LOADING_TEXT: "Loading...",
+    },
+
+    // Styles
+    STYLES: {
+        BUTTON_BACKGROUND_COLOR: '#4caf50',
+        BUTTON_TEXT_COLOR: 'white',
+        BUTTON_HOVER_BACKGROUND_COLOR: '#45a049',
+        PAUSE_BUTTON_BACKGROUND_COLOR: '#ff9800',
+        PAUSE_BUTTON_HOVER_BACKGROUND_COLOR: '#e68900',
+        TITLE_COLOR: '#333',
+        INSTRUCTIONS_COLOR: '#333',
     }
 };
