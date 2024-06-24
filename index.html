@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>Stack or Die</title>
     <style>
@@ -24,8 +24,8 @@
         max-width: 400px;
         margin: 0 auto;
         aspect-ratio: 2 / 3;
+        max-height: 100vh;
       }
-
       canvas {
         width: 100%;
         height: 100%;
@@ -305,7 +305,10 @@
         } else {
           // Desktop layout
           canvasWidth = Math.min(containerWidth, GAME_CONFIG.INITIAL_WIDTH);
-          canvasHeight = canvasWidth / GAME_CONFIG.ASPECT_RATIO;
+          canvasHeight = Math.min(
+            containerHeight,
+            canvasWidth / GAME_CONFIG.ASPECT_RATIO
+          );
         }
 
         canvas.width = canvasWidth;
@@ -315,8 +318,6 @@
         HEIGHT = canvasHeight;
 
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
-
-        drawBackground();
 
         // Redraw the current game state
         if (gameOver) {
@@ -1358,12 +1359,33 @@
 
       window.addEventListener("load", function () {
         // Create and dispatch a synthetic click event
-        var event = new MouseEvent("click", {
+        var clickEvent = new MouseEvent("click", {
           view: window,
           bubbles: true,
           cancelable: true,
         });
-        document.dispatchEvent(event);
+        document.dispatchEvent(clickEvent);
+
+        // Create and dispatch a synthetic touch event
+        var touchEvent = new TouchEvent("touchstart", {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          touches: [
+            new Touch({
+              identifier: Date.now(),
+              target: document.body,
+            }),
+          ],
+          targetTouches: [],
+          changedTouches: [
+            new Touch({
+              identifier: Date.now(),
+              target: document.body,
+            }),
+          ],
+        });
+        document.dispatchEvent(touchEvent);
 
         // Attempt to start the audio
         startMainScreenMusic();
