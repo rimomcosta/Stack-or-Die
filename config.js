@@ -63,6 +63,7 @@ const GAME_CONFIG = {
 
     // Images
     BACKGROUND_IMAGE_SRC: "background.png",
+    BACKGROUND_IMAGE_SRC_MOBILE: "background_mobile.png",
     BAR_IMAGE_SRC: "bricks.jpg",
     POWER_UP_IMAGE_SRC: "ball.png",
     EXTRA_LIFE_IMAGE_SRC: "life.png",

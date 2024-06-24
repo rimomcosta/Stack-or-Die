@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Stack or Die</title>
     <style>
       body {
@@ -19,8 +22,10 @@
         position: relative;
         width: 100%;
         max-width: 400px;
+        margin: 0 auto;
         aspect-ratio: 2 / 3;
       }
+
       canvas {
         width: 100%;
         height: 100%;
@@ -89,6 +94,12 @@
       #tryAgainButton {
         top: 75%;
       }
+      @media (max-width: 600px) {
+        #gameContainer {
+          max-width: none;
+          height: 100vh;
+        }
+      }
     </style>
   </head>
   <body>
@@ -121,6 +132,7 @@
 
       let startTime;
       let elapsedTime = 0;
+      let gameStarted = false;
 
       let blockWidth, blockSpeed, direction, score, level, lives;
       let x, y;
@@ -250,15 +262,38 @@
         const containerWidth = gameContainer.clientWidth;
         const containerHeight = gameContainer.clientHeight;
 
-        canvas.width = containerWidth;
-        canvas.height = containerHeight;
+        let canvasWidth, canvasHeight;
 
-        WIDTH = containerWidth;
-        HEIGHT = containerHeight;
+        if (window.innerWidth <= 600) {
+          // Mobile layout
+          canvasWidth = containerWidth;
+          canvasHeight = containerHeight;
+        } else {
+          // Desktop layout
+          canvasWidth = Math.min(containerWidth, GAME_CONFIG.INITIAL_WIDTH);
+          canvasHeight = canvasWidth / GAME_CONFIG.ASPECT_RATIO;
+        }
+
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        WIDTH = canvasWidth;
+        HEIGHT = canvasHeight;
 
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
 
         drawBackground();
+
+        // Redraw the current game state
+        if (gameOver) {
+          drawGameOverScreen();
+        } else if (isPaused) {
+          drawPauseScreen();
+        } else if (!gameStarted) {
+          showMainScreen();
+        } else {
+          drawGameState();
+        }
       }
 
       function initAudioContext() {
@@ -468,6 +503,7 @@
 
         pauseButton.style.display = "block";
         animationFrameId = requestAnimationFrame(gameLoop);
+        resizeCanvas();
       }
 
       function togglePause() {
@@ -1125,6 +1161,7 @@
       }
 
       function showMainScreen() {
+        // Clear the canvas
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
         gameTitle.style.display = "block";
@@ -1134,7 +1171,10 @@
         mainScreenButton.style.display = "none";
         pauseButton.style.display = "none";
 
+        // Redraw the background
         drawBackground();
+
+        gameStarted = false; // Add this line
       }
 
       function hideMainScreen() {
@@ -1164,6 +1204,8 @@
           if (backgroundMusicBuffer) {
             playBackgroundMusic(backgroundMusicBuffer);
           }
+
+          gameStarted = true; // Add this line
         } catch (error) {
           console.error("Error starting game:", error);
           loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
@@ -1243,6 +1285,13 @@
       document.addEventListener("click", startMainScreenMusic, { once: true });
       document.addEventListener("keydown", startMainScreenMusic, {
         once: true,
+      });
+      document.addEventListener("keydown", startMainScreenMusic, {
+        once: true,
+      });
+
+      window.addEventListener("orientationchange", function () {
+        setTimeout(resizeCanvas, 100);
       });
     </script>
   </body>
