@@ -22,22 +22,26 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
         background-color: #f0f0f0;
         font-family: Arial, sans-serif;
       }
+
       #gameContainer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        overflow: hidden;
-      }
-      canvas {
+        position: fixed;
         width: 100%;
         height: 100%;
-        display: block;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #f0f0f0;
+        overflow: hidden;
+      }
+
+      canvas {
+        position: absolute;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
       }
       #gameTitle {
         position: absolute;
@@ -74,13 +78,10 @@
         display: none;
       }
       #pauseButton {
-        right: 10px;
-        top: 40px;
-        left: auto;
-        transform: none;
         padding: 5px 10px;
         display: none;
         min-width: 80px;
+        max-width: 80px;
         text-align: center;
       }
       #loadingIndicator {
@@ -104,14 +105,15 @@
       }
       @media (max-width: 600px) {
         #gameContainer {
+          width: 100%;
+          height: 100%;
           max-width: none;
-          height: 100vh;
         }
       }
+
       @supports (-webkit-touch-callout: none) {
         #gameContainer {
-          height: 100svh; /* Use svh (safe viewport height) for iOS Safari */
-          max-height: 100svh;
+          height: -webkit-fill-available;
         }
       }
     </style>
@@ -314,21 +316,23 @@
       }
 
       function resizeCanvas() {
-        const containerWidth = window.innerWidth;
-        const containerHeight = isiOSSafari()
-          ? window.innerHeight
-          : gameContainer.clientHeight;
+        const containerWidth = gameContainer.clientWidth;
+        const containerHeight = gameContainer.clientHeight;
+        const aspectRatio = GAME_CONFIG.ASPECT_RATIO;
 
         let canvasWidth, canvasHeight;
 
-        if (window.innerWidth <= 600 || isiOSSafari()) {
-          // Mobile layout or iOS Safari
+        if (window.innerWidth <= 600) {
           canvasWidth = containerWidth;
           canvasHeight = containerHeight;
         } else {
-          // Desktop layout
-          canvasWidth = Math.min(containerWidth, GAME_CONFIG.INITIAL_WIDTH);
-          canvasHeight = canvasWidth / GAME_CONFIG.ASPECT_RATIO;
+          if (containerWidth / containerHeight > aspectRatio) {
+            canvasHeight = containerHeight;
+            canvasWidth = canvasHeight * aspectRatio;
+          } else {
+            canvasWidth = containerWidth;
+            canvasHeight = canvasWidth / aspectRatio;
+          }
         }
 
         canvas.style.width = `${canvasWidth}px`;
@@ -342,7 +346,12 @@
 
         scale = WIDTH / GAME_CONFIG.INITIAL_WIDTH;
 
-        // Redraw the current game state
+        canvas.style.position = "absolute";
+        canvas.style.left = `${(containerWidth - canvasWidth) / 2}px`;
+        canvas.style.top = `${(containerHeight - canvasHeight) / 2}px`;
+
+        adjustUIElements();
+
         if (gameOver) {
           drawGameOverScreen();
         } else if (isPaused) {
@@ -352,6 +361,42 @@
         } else {
           drawGameState();
         }
+      }
+
+      function adjustUIElements() {
+        const elements = [
+          gameTitle,
+          instructions,
+          startButton,
+          tryAgainButton,
+          pauseButton,
+          mainScreenButton,
+        ];
+        elements.forEach((element) => {
+          if (element) {
+            element.style.position = "absolute";
+            element.style.left = `${canvas.offsetLeft + WIDTH / 2}px`;
+            element.style.transform = "translateX(-50%)";
+          }
+        });
+
+        if (gameTitle)
+          gameTitle.style.top = `${canvas.offsetTop + HEIGHT * 0.1}px`;
+        if (instructions)
+          instructions.style.top = `${canvas.offsetTop + HEIGHT * 0.65}px`;
+        if (startButton)
+          startButton.style.top = `${canvas.offsetTop + HEIGHT * 0.5}px`;
+        if (tryAgainButton)
+          tryAgainButton.style.top = `${canvas.offsetTop + HEIGHT * 0.75}px`;
+        if (pauseButton) {
+          pauseButton.style.top = `${canvas.offsetTop + 30}px`;
+          pauseButton.style.left = `${
+            canvas.offsetLeft + WIDTH - pauseButton.offsetWidth - 20
+          }px`;
+          pauseButton.style.transform = "none";
+        }
+        if (mainScreenButton)
+          mainScreenButton.style.top = `${canvas.offsetTop + HEIGHT * 0.65}px`;
       }
 
       function initAudioContext() {
@@ -575,7 +620,7 @@
           audioContext.resume();
         }
 
-        pauseButton.style.display = "block";
+        pauseButton.style.display = "block"; // Ensure the pause button is visible
         animationFrameId = requestAnimationFrame(gameLoop);
         resizeCanvas();
       }
@@ -668,13 +713,23 @@
         ctx.font = `${20 * scale}px ${GAME_CONFIG.FONT_FAMILY}`;
         ctx.textAlign = "left";
 
-        ctx.fillText(`Score: ${score}`, 10 * scale, 30 * scale);
-        ctx.fillText(`Level: ${level}`, 10 * scale, 55 * scale);
-        ctx.fillText(`Lives: ${lives}`, 10 * scale, 80 * scale);
+        const lineHeight = 25 * scale;
+        const topPadding = 30 * scale;
 
-        ctx.textAlign = "right";
         const timeText = `Time: ${formatTime(elapsedTime)}`;
-        ctx.fillText(timeText, WIDTH - 10 * scale, 30 * scale);
+        ctx.fillText(timeText, 10 * scale, topPadding);
+
+        ctx.fillText(`Score: ${score}`, 10 * scale, topPadding + lineHeight);
+        ctx.fillText(
+          `Level: ${level}`,
+          10 * scale,
+          topPadding + 2 * lineHeight
+        );
+        ctx.fillText(
+          `Lives: ${lives}`,
+          10 * scale,
+          topPadding + 3 * lineHeight
+        );
 
         ctx.textAlign = "left";
       }
@@ -1284,6 +1339,7 @@
           }
 
           gameStarted = true;
+          pauseButton.style.display = "block"; // Ensure the pause button is visible
         } catch (error) {
           console.error("Error starting game:", error);
           loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
@@ -1448,6 +1504,10 @@
         },
         { passive: false }
       );
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", resizeCanvas);
+      }
     </script>
   </body>
 </html>
