@@ -298,6 +298,13 @@
         }
       }
 
+      function isiOSSafari() {
+        const ua = window.navigator.userAgent;
+        const iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
+        const webkit = !!ua.match(/WebKit/i);
+        return iOS && webkit && !ua.match(/CriOS/i);
+      }
+
       function resizeCanvas() {
         const containerWidth = gameContainer.clientWidth;
         const containerHeight = gameContainer.clientHeight;
@@ -308,13 +315,18 @@
           // Mobile layout
           canvasWidth = containerWidth;
           canvasHeight = containerHeight;
+
+          if (isiOSSafari()) {
+            // Adjust for iOS Safari
+            const viewportHeight = window.visualViewport
+              ? window.visualViewport.height
+              : window.innerHeight;
+            canvasHeight = viewportHeight;
+          }
         } else {
-          // Desktop layout
+          // Desktop layout (unchanged)
           canvasWidth = Math.min(containerWidth, GAME_CONFIG.INITIAL_WIDTH);
-          canvasHeight = Math.min(
-            containerHeight,
-            canvasWidth / GAME_CONFIG.ASPECT_RATIO
-          );
+          canvasHeight = canvasWidth / GAME_CONFIG.ASPECT_RATIO;
         }
 
         canvas.width = canvasWidth;
@@ -1396,6 +1408,13 @@
         // Attempt to start the audio
         startMainScreenMusic();
       });
+
+      window.addEventListener("load", resizeCanvas);
+      window.addEventListener("resize", resizeCanvas);
+
+      if (isiOSSafari() && window.visualViewport) {
+        window.visualViewport.addEventListener("resize", resizeCanvas);
+      }
     </script>
   </body>
 </html>
