@@ -511,6 +511,13 @@
           gameOverMusicBuffer = audioSources["GAME_OVER_MUSIC"];
         }
 
+        // Create and load a short silent audio buffer for "warming up" the audio context
+        const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+        const source = audioContext.createBufferSource();
+        source.buffer = silentBuffer;
+        source.connect(audioContext.destination);
+        source.start();
+
         return audioContext.resume();
       }
 
@@ -520,7 +527,8 @@
           return;
         }
 
-        if (audioContext.state === "suspended") {
+        // Ensure the audio context is in the right state
+        if (audioContext.state !== "running") {
           try {
             await audioContext.resume();
           } catch (error) {
@@ -1392,48 +1400,32 @@
         isLoading = true;
         startButton.disabled = true;
         loadingIndicator.style.display = "block";
+        loadingIndicator.textContent = "Preparing audio...";
 
         try {
-          // Initialize audio context if it hasn't been already
-          if (!audioContext) {
-            audioContext = new (window.AudioContext ||
-              window.webkitAudioContext)();
-          }
+          await initAudio(); // Ensure audio is initialized and loaded
 
-          // If the audio context is in a suspended state, try to resume it
-          if (audioContext.state === "suspended") {
-            await audioContext.resume();
-          }
-
-          // Load audio if it hasn't been loaded yet
-          if (Object.keys(audioSources).length === 0) {
-            await initAudio();
-          }
-
-          hasInteracted = true;
-
-          stopAllMusic(); // Stop any currently playing music
+          stopAllMusic();
           loadPowerUpImages();
           initGame();
           hideMainScreen();
           mainScreenButton.style.display = "none";
-          loadingIndicator.style.display = "none";
 
-          // Ensure background music starts
           if (backgroundMusicBuffer) {
-            playBackgroundMusic(backgroundMusicBuffer);
+            await playBackgroundMusic(backgroundMusicBuffer);
           } else {
             console.warn("Background music buffer not loaded");
           }
 
           gameStarted = true;
-          pauseButton.style.display = "block"; // Ensure the pause button is visible
+          pauseButton.style.display = "block";
         } catch (error) {
           console.error("Error starting game:", error);
           loadingIndicator.textContent = GAME_CONFIG.UI.LOADING_ERROR_TEXT;
         } finally {
           isLoading = false;
           startButton.disabled = false;
+          loadingIndicator.style.display = "none";
           if (!gameStarted) {
             gameStarted = true;
             animationFrameId = requestAnimationFrame(gameLoop);
@@ -1596,6 +1588,25 @@
       if (window.visualViewport) {
         window.visualViewport.addEventListener("resize", resizeCanvas);
       }
+
+      // At the end of your initial setup code
+      initAudio().catch(console.error);
+
+      // Add this to handle the first user interaction
+      document.addEventListener(
+        "click",
+        async () => {
+          if (!hasInteracted) {
+            try {
+              await initAudio();
+              hasInteracted = true;
+            } catch (error) {
+              console.error("Error initializing audio:", error);
+            }
+          }
+        },
+        { once: true }
+      );
     </script>
   </body>
 </html>
