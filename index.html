@@ -149,6 +149,8 @@
       let startTime;
       let elapsedTime = 0;
       let gameStarted = false;
+      let lastFrameTime = 0;
+      let deltaTime = 0;
 
       let blockWidth, blockSpeed, direction, score, level, lives;
       let x, y;
@@ -179,7 +181,26 @@
         : null;
 
       const barImage = GAME_CONFIG.BAR_IMAGE_SRC ? new Image() : null;
-      if (barImage) barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
+      if (barImage) {
+        barImage.onload = function() {
+          createParticleCache();
+        };
+        barImage.src = GAME_CONFIG.BAR_IMAGE_SRC;
+      }
+      
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      let particleCache = null;
+      
+      function createParticleCache() {
+        if (!barImage || !barImage.complete) return;
+        
+        particleCache = document.createElement('canvas');
+        particleCache.width = 64;
+        particleCache.height = 64;
+        const cacheCtx = particleCache.getContext('2d');
+        
+        cacheCtx.drawImage(barImage, 0, 0, 64, 64, 0, 0, 64, 64);
+      }
 
       function loadBackgroundImages() {
         if (backgroundImage) {
@@ -518,7 +539,7 @@
           audioContext
             .resume()
             .then(() => {
-              playBackgroundMusic(buffer); // Retry after resuming
+              playBackgroundMusic(buffer);
             })
             .catch((error) => {
               console.error("Failed to resume audio context:", error);
@@ -623,6 +644,8 @@
         levelUpTimer = 0;
         tryAgainButton.style.display = "none";
         startTime = Date.now();
+        lastFrameTime = 0;
+        deltaTime = 0;
         resetBlockPosition();
         resetPlaceTimeLimit();
         pauseStartTime = 0;
@@ -635,7 +658,7 @@
           audioContext.resume();
         }
 
-        pauseButton.style.display = "block"; // Ensure the pause button is visible
+        pauseButton.style.display = "block";
         animationFrameId = requestAnimationFrame(gameLoop);
         resizeCanvas();
       }
@@ -647,11 +670,16 @@
           pauseStartTime = Date.now();
           pauseButton.textContent = GAME_CONFIG.UI.RESUME_BUTTON_TEXT;
           pauseBackgroundMusic();
+          playMainScreenMusic();
         } else {
           isPaused = false;
           totalPausedTime += Date.now() - pauseStartTime;
           pauseButton.textContent = GAME_CONFIG.UI.PAUSE_BUTTON_TEXT;
           resumeBackgroundMusic();
+          if (mainScreenMusicSource && mainScreenMusicSource.isPlaying) {
+            mainScreenMusicSource.stop();
+            mainScreenMusicSource.isPlaying = false;
+          }
         }
         drawBackground();
       }
@@ -757,7 +785,7 @@
       }
 
       function moveBlock() {
-        x += blockSpeed * direction;
+        x += blockSpeed * direction * deltaTime * 60;
         if (x < 0) {
           x = 0;
           direction = 1;
@@ -769,7 +797,13 @@
         }
       }
 
-      function gameLoop() {
+      function gameLoop(currentTime) {
+        if (lastFrameTime === 0) {
+          lastFrameTime = currentTime;
+        }
+        deltaTime = (currentTime - lastFrameTime) / 1000;
+        lastFrameTime = currentTime;
+        
         if (gameOver) {
           showGameOver();
         } else if (isPaused) {
@@ -785,7 +819,7 @@
             moveBlock();
             checkPowerUpCollision();
 
-            placeTimeRemaining -= 1 / 60;
+                    placeTimeRemaining -= deltaTime;
             if (placeTimeRemaining <= 0) {
               placeBlock();
               resetPlaceTimeLimit();
@@ -918,12 +952,18 @@
 
         for (let i = powerUps.length - 1; i >= 0; i--) {
           let powerUp = powerUps[i];
-          powerUp.y += GAME_CONFIG.POWER_UP_FALL_SPEED * scale;
-          powerUp.angle += GAME_CONFIG.POWER_UP_WIGGLE_SPEED;
+          if (!powerUp.fallSpeed) {
+            const variance = GAME_CONFIG.POWER_UP_FALL_SPEED_VARIANCE;
+            const baseSpeed = GAME_CONFIG.POWER_UP_FALL_SPEED;
+            const randomFactor = 1 + (Math.random() - 0.5) * variance * 2;
+            powerUp.fallSpeed = baseSpeed * randomFactor;
+          }
+          powerUp.y += powerUp.fallSpeed * deltaTime * 60;
+          powerUp.angle += GAME_CONFIG.POWER_UP_WIGGLE_SPEED * deltaTime * 60;
           powerUp.x +=
             Math.sin(powerUp.angle) *
             GAME_CONFIG.POWER_UP_WIGGLE_AMPLITUDE *
-            scale;
+            deltaTime * 60;
 
           if (powerUp.x < 0) powerUp.x += WIDTH;
           if (powerUp.x > WIDTH) powerUp.x -= WIDTH;
@@ -1256,7 +1296,26 @@
           ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
           ctx.rotate(p.rotation);
 
-          if (barImage) {
+          if (isMobileDevice || !barImage) {
+            ctx.fillStyle = GAME_CONFIG.BLOCK_COLOR;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+            
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          } else if (particleCache) {
+            ctx.drawImage(
+              particleCache,
+              0,
+              0,
+              particleCache.width,
+              particleCache.height,
+              -p.size / 2,
+              -p.size / 2,
+              p.size,
+              p.size
+            );
+          } else if (barImage) {
             ctx.drawImage(
               barImage,
               p.sourceX,
@@ -1268,9 +1327,6 @@
               p.size,
               p.size
             );
-          } else {
-            ctx.fillStyle = GAME_CONFIG.BLOCK_COLOR;
-            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
           }
 
           ctx.restore();
@@ -1280,7 +1336,7 @@
           }
         }
 
-        ctx.restore(); // Restore the original context state
+                  ctx.restore();
       }
 
       function drawGameOverScreen() {
@@ -1335,10 +1391,17 @@
       function handleMainScreen() {
         stopAllMusic();
         showMainScreen();
-        playMainScreenMusic();
+        if (mainScreenMusicBuffer && !gameStarted) {
+          playMainScreenMusic();
+        }
       }
 
       function restartGame() {
+        stopAllMusic();
+        
+        musicPausedAt = 0;
+        musicStartTime = 0;
+        
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
         gameOverScreenShown = false;
 
@@ -1360,8 +1423,9 @@
         hideMainScreen();
       }
 
+
+
       function showMainScreen() {
-        // Clear the canvas
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
         gameTitle.style.display = "block";
@@ -1371,10 +1435,9 @@
         mainScreenButton.style.display = "none";
         pauseButton.style.display = "none";
 
-        // Redraw the background
         drawBackground();
 
-        gameStarted = false; // Add this line
+        gameStarted = false;
       }
 
       function hideMainScreen() {
@@ -1392,29 +1455,31 @@
         loadingIndicator.textContent = "Starting game...";
 
         try {
-          // Initialize audio context if it hasn't been already
           if (!audioContext) {
             audioContext = new (window.AudioContext ||
               window.webkitAudioContext)();
           }
 
-          // Ensure the audio context is running
           if (audioContext.state !== "running") {
             await audioContext.resume();
           }
 
-          // Load audio if it hasn't been loaded yet
           if (Object.keys(audioSources).length === 0) {
             await initAudio();
           }
 
           stopAllMusic();
+          
+          if (mainScreenMusicSource) {
+            mainScreenMusicSource.stop();
+            mainScreenMusicSource.isPlaying = false;
+          }
+          
           loadPowerUpImages();
           initGame();
           hideMainScreen();
           mainScreenButton.style.display = "none";
 
-          // Start background music
           if (backgroundMusicBuffer) {
             playBackgroundMusic(backgroundMusicBuffer);
           } else {
@@ -1438,13 +1503,42 @@
       }
 
       function startMainScreenMusic() {
-        if (!hasInteracted) {
+
+        if (!hasInteracted || !mainScreenMusicBuffer) {
           hasInteracted = true;
-          initAudio().then(() => {
-            if (!gameStarted) {
-              playMainScreenMusic();
-            }
-          });
+          
+
+          if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          
+
+          if (audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+
+              initAudio().then(() => {
+                if (mainScreenMusicBuffer && !gameStarted) {
+                  playMainScreenMusic();
+                }
+              }).catch(error => {
+                console.error("Failed to initialize audio:", error);
+              });
+            }).catch(error => {
+              console.error("Failed to resume audio context:", error);
+            });
+          } else {
+
+            initAudio().then(() => {
+              if (mainScreenMusicBuffer && !gameStarted) {
+                playMainScreenMusic();
+              }
+            }).catch(error => {
+              console.error("Failed to initialize audio:", error);
+            });
+          }
+        } else if (mainScreenMusicBuffer && !gameStarted) {
+
+          playMainScreenMusic();
         }
       }
 
@@ -1500,61 +1594,25 @@
         }
       });
 
-      // Initial setup
+
       initUI();
       loadBackgroundImages();
       resizeCanvas();
       window.addEventListener("resize", resizeCanvas);
       showMainScreen();
 
-      // Start main screen music on first interaction
+
       document.addEventListener("click", startMainScreenMusic, { once: true });
-      document.addEventListener("keydown", startMainScreenMusic, {
-        once: true,
-      });
-      document.addEventListener("pointerdown", startMainScreenMusic, {
-        once: true,
-      });
-      document.addEventListener("touchstart", startMainScreenMusic, {
-        once: true,
-      });
+      document.addEventListener("keydown", startMainScreenMusic, { once: true });
+      document.addEventListener("pointerdown", startMainScreenMusic, { once: true });
+      document.addEventListener("touchstart", startMainScreenMusic, { once: true });
 
       window.addEventListener("orientationchange", function () {
         setTimeout(resizeCanvas, 100);
       });
 
       window.addEventListener("load", function () {
-        // Create and dispatch synthetic events
-        var clickEvent = new MouseEvent("click", {
-          view: window,
-          bubbles: true,
-          cancelable: true,
-        });
-        document.dispatchEvent(clickEvent);
 
-        var touchEvent = new TouchEvent("touchstart", {
-          view: window,
-          bubbles: true,
-          cancelable: true,
-          touches: [
-            new Touch({ identifier: Date.now(), target: document.body }),
-          ],
-          targetTouches: [],
-          changedTouches: [
-            new Touch({ identifier: Date.now(), target: document.body }),
-          ],
-        });
-        document.dispatchEvent(touchEvent);
-
-        var pointerEvent = new PointerEvent("pointerdown", {
-          view: window,
-          bubbles: true,
-          cancelable: true,
-        });
-        document.dispatchEvent(pointerEvent);
-
-        // Attempt to start the audio
-        startMainScreenMusic();
       });
 
       window.addEventListener("load", resizeCanvas);
@@ -1563,14 +1621,14 @@
       if (isiOSSafari() && window.visualViewport) {
         window.visualViewport.addEventListener("resize", resizeCanvas);
       }
-      // Call resizeCanvas on load, resize, and orientation change
+
       window.addEventListener("load", resizeCanvas);
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", function () {
         setTimeout(resizeCanvas, 100);
       });
 
-      // For iOS Safari, also listen to scroll events
+
       if (isiOSSafari()) {
         window.addEventListener("scroll", function () {
           window.scrollTo(0, 0);
@@ -1578,7 +1636,7 @@
         });
       }
 
-      // Initial call with a slight delay
+
       setTimeout(resizeCanvas, 100);
 
       document.body.addEventListener(
@@ -1593,7 +1651,7 @@
         window.visualViewport.addEventListener("resize", resizeCanvas);
       }
 
-      // Add this to handle the first user interaction
+
       document.addEventListener(
         "click",
         async () => {

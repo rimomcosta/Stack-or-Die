@@ -1,0 +1,9 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Unused assets (kept locally but not in repo)
+assets/unused/
+
+# Temporary files
+base64.txt
